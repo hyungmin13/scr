@@ -1,0 +1,1 @@
+Input file must be .npy formant with [t,x,y,z,u,v,w,p,T,accx,accy,accz] order

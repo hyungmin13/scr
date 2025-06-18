@@ -1,7 +1,8 @@
 #%%
 import numpy as np
 import jax.numpy as jnp
-
+import os
+from glob import glob
 class Domainbase:
     @staticmethod
     def init_params(*args):
@@ -22,9 +23,10 @@ class Domainbase:
     
 class Domain(Domainbase):
     @staticmethod
-    def init_params(domain_range, frequency, grid_size, bound_keys):
-        domain_params = {'domain_range':domain_range, 'frequency':frequency, 
-                       'grid_size': grid_size, 'bound_keys':bound_keys}
+    def init_params(**kwargs):
+        domain_params = {}
+        for key, value in kwargs.items():
+            domain_params[key] = value
         return domain_params
 
     @staticmethod
@@ -38,9 +40,9 @@ class Domain(Domainbase):
             for arg_key in arg_keys:
                 if arg_key in bound_key:
                     if 'u' in bound_key:
-                        total_bound[bound_key][arg_key] = grids['eqns'][arg_key][-1]
+                        total_bound[bound_key][arg_key] = np.array([grids['eqns'][arg_key][-1]])
                     else:
-                        total_bound[bound_key][arg_key] = grids['eqns'][arg_key][0]
+                        total_bound[bound_key][arg_key] = np.array([grids['eqns'][arg_key][0]])
             if 'ic' in bound_key:
                 total_bound[bound_key]['t'] = grids['eqns']['t'][0]
         grids.update(total_bound)
@@ -49,7 +51,6 @@ class Domain(Domainbase):
     @staticmethod
     def normalize(all_params, grids):
         domain_range = all_params["domain"]["domain_range"]
-        frequency = all_params["domain"]["frequency"]
         key_list = list(grids.keys())
         arg_keys = ['t', 'x', 'y', 'z']
         for i in range(len(key_list)):
@@ -61,16 +62,20 @@ class Domain(Domainbase):
     @staticmethod
     def sampler(all_params):
         domain_range = all_params["domain"]["domain_range"]
-        frequency = all_params["domain"]["frequency"]
         grid_size = all_params["domain"]["grid_size"]
-
+        path = all_params["data"]['path']
+        cur_dir = os.getcwd()
+        filenames = sorted(glob(os.path.dirname(cur_dir)+path+'*.npy'))
+        t = []
+        for filename in filenames:
+            temp = np.load(filename)
+            t.append(temp[0,0])
+        t = np.array(t)
         arg_keys = ['t', 'x', 'y', 'z']
         grids = {'eqns':{arg_keys[j]:[] for j in range(len(arg_keys))}}
-        for i in range(len(arg_keys)):
-            grids['eqns'][arg_keys[i]] = np.linspace(domain_range[arg_keys[i]][0], domain_range[arg_keys[i]][1], grid_size[i])
-        #grids['eqns']['t'] = np.linspace(domain_range[arg_keys[0]][0]/frequency, domain_range[arg_keys[0]][1]/frequency, grid_size[0])
-        print(grids['eqns']['t'])
-        #grids['eqns']['t'] = np.linspace(domain_range[arg_keys[0]][0]/frequency, domain_range[arg_keys[0]][1]/frequency, grid_size[0])
+        grids['eqns']['t'] = t
+        for i in range(len(arg_keys)-1):
+            grids['eqns'][arg_keys[i+1]] = np.linspace(domain_range[arg_keys[i+1]][0], domain_range[arg_keys[i+1]][1], grid_size[i])
         grids = Domain.bound_sampler(all_params, grids)
         grids = Domain.normalize(all_params, grids)
         all_params["domain"]["in_min"] = jnp.array([[domain_range['t'][0], domain_range['x'][0], domain_range['y'][0], domain_range['z'][0]]])
@@ -80,12 +85,18 @@ class Domain(Domainbase):
 
 
 if __name__ == "__main__":
-    all_params = {"domain":{}}
-    frequency = 1250
-    domain_range = {'t':(0,50/frequency), 'x':(0,0.1), 'y':(0,0.1), 'z':(0,0.1)}
+    from PINN_trackdata import *
+    all_params = {"domain":{}, "data":{}}
+    path = '/RBC_G8_DNS/npdata/lv6_xbound/'
+    data_keys = ['pos', 'vel', 'T']
+    viscosity = 15*10**(-6)
+    all_params["data"] = Data.init_params(path = path, data_keys = data_keys, viscosity = viscosity)
+    
+    domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,8), 'z':(0,1)}
     grid_size = [51, 200, 200, 200]
     bound_keys = ['ic', 'bcxu', 'bcxl', 'bcyu', 'bcyl', 'bczu', 'bczl']
-    all_params["domain"] = Domain.init_params(domain_range, frequency, grid_size, bound_keys)
+    all_params["domain"] = Domain.init_params(domain_range = domain_range, grid_size = grid_size, bound_keys = bound_keys)
+    
     grids, all_params = Domain.sampler(all_params)
 
     import matplotlib.pyplot as plt
