@@ -214,12 +214,13 @@ class PINN(PINNbase):
             e_key = next(e_batch_key)
             e_batch_pos = random.choice(e_key, valid_data['pos'], shape = (self.c.optimization_init_kwargs["e_batch"],))
             e_batch_vel = random.choice(e_key, valid_data['vel'], shape = (self.c.optimization_init_kwargs["e_batch"],))
+            e_batch_T = random.choice(e_key, valid_data['T'], shape = (self.c.optimization_init_kwargs["e_batch"],))
             v_pred2 = model_fns(all_params, e_batch_pos)
-            p_new = 1.185*all_params["data"]["u_ref"]*v_pred2[:,3:]-(jnp.mean(1.185*all_params["data"]["u_ref"]*v_pred2[:,3:] - e_batch_vel[:,3:]))
+        
             u_error = jnp.sqrt(jnp.mean((all_params["data"]["u_ref"]*v_pred2[:,0:1] - e_batch_vel[:,0:1])**2)/jnp.mean(e_batch_vel[:,0:1]**2))
             v_error = jnp.sqrt(jnp.mean((all_params["data"]["v_ref"]*v_pred2[:,1:2] - e_batch_vel[:,1:2])**2)/jnp.mean(e_batch_vel[:,1:2]**2))
             w_error = jnp.sqrt(jnp.mean((all_params["data"]["w_ref"]*v_pred2[:,2:3] - e_batch_vel[:,2:3])**2)/jnp.mean(e_batch_vel[:,2:3]**2))
-            p_error = jnp.sqrt(jnp.mean((p_new - e_batch_vel[:,3:])**2)/jnp.mean(e_batch_vel[:,3:4]**2))
+            T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred2[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
             v_pred = model_fns(all_params, p_batch)
             u_loss = jnp.mean((all_params["data"]["u_ref"]*v_pred[:,0:1] - v_batch[:,0:1])**2)
             v_loss = jnp.mean((all_params["data"]["v_ref"]*v_pred[:,1:2] - v_batch[:,1:2])**2)
@@ -229,7 +230,7 @@ class PINN(PINNbase):
             with open(self.c.model_out_dir + "saved_dic_"+str(i)+".pkl","wb") as f:
                 pickle.dump(serialised_model,f)
             
-            print(u_loss, v_loss, w_loss, u_error, v_error, w_error, p_error)
+            print(u_loss, v_loss, w_loss, u_error, v_error, w_error, T_error)
 
         return
 
