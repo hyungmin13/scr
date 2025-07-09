@@ -1,7 +1,7 @@
 #%%
 import numpy as np
 import optax
-import PINN_domain, PINN_trackdata, PINN_network, PINN_problem
+import domain, trackdata, network, problem, equation
 import os
 import shutil
 import pickle
@@ -27,7 +27,11 @@ class ConstantsBase:
     def model_out_dir(self):
         cur_dir = os.getcwd()
         return f"{os.path.dirname(cur_dir)}/{self.run}/models/"
-
+    @property
+    def report_out_dir(self):
+        cur_dir = os.getcwd()
+        return f"{os.path.dirname(cur_dir)}/{self.run}/reports/"
+    
     def get_outdirs(self):
         if os.path.exists(self.summary_out_dir):
             print('Loading saved checkpoints')
@@ -37,13 +41,19 @@ class ConstantsBase:
             print('Loading saved checkpoints')
         else:
             Path(self.model_out_dir).mkdir(exist_ok=True, parents=True)
-
+        if os.path.exists(self.report_out_dir):
+            print('Loading saved checkpoints')
+        else:
+            Path(self.report_out_dir).mkdir(exist_ok=True, parents=True)
 
     def save_constants_file(self):
         with open(self.summary_out_dir + f"constants.txt", 'w') as f:
             for k in vars(self): f.write(f"{k}: {self[k]}\n")
         with open(self.summary_out_dir + f"constants.pickle", 'wb') as f:
             pickle.dump(vars(self), f)
+        with open(self.report_out_dir + f"reports.txt", 'w') as f:
+            f.write(f"{'Steps':{12}} {'Loss':{12}} {'U_loss':{12}} {'V_loss':{12}} {'W_loss':{12}} {'Con_loss':{12}} {'NS1_loss':{12}} {'NS2_loss':{12}} {'NS3_loss':{12}} {'ENR_loss':{12}} {'U_error':{12}} {'V_error':{12}} {'W_error':{12}} {'T_error':{12}}\n")
+
     @property
     def constants_file(self):
         return self.summary_out_dir + f"constants.pickle"
@@ -73,19 +83,24 @@ class Constants(ConstantsBase):
         self.network_init_kwargs = dict()
         self.problem_init_kwargs = dict()
         self.optimization_init_kwargs = dict()
-        
+        self.equation_init_kwargs = dict()
         for key in kwargs.keys(): self[key] = kwargs[key]
 
-        self.domain = PINN_domain.Domain
-        self.data = PINN_trackdata.Data
-        self.network = eval('PINN_network.'+ self.network_init_kwargs['network_name'])
-        self.problem = PINN_problem.Problem
+        self.domain = domain.Domain
+        self.data = trackdata.Data
+        self.network = eval('network.'+ self.network_init_kwargs['network_name'])
+        self.problem = problem.Problem
+        self.equation = eval('equation.'+ self.equation_init_kwargs['equation'])
         if self.optimization_init_kwargs['optimiser'] == 'soap':
             self.optimization_init_kwargs['optimiser'] = soap
+        else:
+            self.optimization_init_kwargs['optimiser'] = optax.adam
+        
+
 if __name__ == "__main__":
-    from PINN_domain import *
-    from PINN_trackdata import *
-    from PINN_network import *
+    from domain import *
+    from trackdata import *
+    from network import *
 
     run = "run00"
     all_params = {"domain":{}, "data":{}, "network":{}}

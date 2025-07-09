@@ -85,7 +85,7 @@ class Domain(Domainbase):
 
 
 if __name__ == "__main__":
-    from PINN_trackdata import *
+    from trackdata import *
     all_params = {"domain":{}, "data":{}}
     path = '/RBC_G8_DNS/npdata/lv6_xbound/'
     data_keys = ['pos', 'vel', 'T']

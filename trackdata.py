@@ -278,7 +278,7 @@ class Data(Database):
     
 
 if __name__ == "__main__":
-    from PINN_domain import *
+    from domain import *
     all_params = {"data":{}, "domain":{}}
 
     cur_dir = os.getcwd()

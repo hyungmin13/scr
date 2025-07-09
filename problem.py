@@ -5,7 +5,7 @@ import numpy as np
 import h5py
 from glob import glob
 import os
-from PINN_trackdata import *
+from trackdata import *
 class Problembase:
     @staticmethod
     def init_params(*args):
@@ -33,8 +33,8 @@ class Problem(Problembase):
         return valid_data
     
 if __name__ == "__main__":
-    from PINN_trackdata import *
-    from PINN_domain import *
+    from trackdata import *
+    from domain import *
     all_params = {"problem":{}, "data":{}, "domain":{}}
 
     domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,8), 'z':(0,1)}

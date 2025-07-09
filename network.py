@@ -58,7 +58,7 @@ class MLP(Network):
 
 
 if __name__=="__main__":
-    from PINN_domain import *
+    from domain import *
 
     all_params = {"network":{}, "domain":{}}
     domain_range = {'t':(0,8), 'x':(0,1.2), 'y':(0,1.2), 'z':(0,1)}

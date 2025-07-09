@@ -4,7 +4,7 @@ import pickle
 import ast
 import pickle
 import re
-from PINN_constants import *
+from constants import *
 def parse_tree_structured_txt(txt_path):
     tree_dict = {}
 
