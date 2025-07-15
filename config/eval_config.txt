@@ -1,0 +1,4 @@
+path: ETFS/HIT/config/
+temporal_init_kwargs: {'activate': 1}
+behavior_init_kwargs: {'activate': 0, 'timestep': 25}
+tecplot_init_kwargs: {'activate': 0, 'is_ground': 1, 'is_mean': 0, 'path': 'ETFS/HIT/', 'out_shape': (51, 125, 125, 125), 'domain_range': {'t': (0, 0.4), 'x': (0.4, 99.6), 'y': (0.4, 99.6), 'z': (0.4, 99.6)}, 'timestep': 25}
