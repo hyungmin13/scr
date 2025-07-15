@@ -298,8 +298,3 @@ if __name__ == "__main__":
                                               grid_size = grid_size)
     
     train_data, all_params = Data.train_data(all_params)
-#%%
-    print(list(all_params["domain"]["domain_range"].keys()))
-# %%
-    print(np.min(train_data['T']))
-# %%
