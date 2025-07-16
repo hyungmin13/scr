@@ -47,6 +47,12 @@ class ConstantsBase:
             Path(self.report_out_dir).mkdir(exist_ok=True, parents=True)
 
     def save_constants_file(self):
+        if os.path.exists(os.path.dirname(self.summary_out_dir)):
+            pass
+        else:
+            print('check')
+            print(os.path.dirname(self.summary_out_dir))
+            os.mkdir(os.path.dirname(self.summary_out_dir))
         with open(self.summary_out_dir + f"constants.txt", 'w') as f:
             for k in vars(self): f.write(f"{k}: {self[k]}\n")
         with open(self.summary_out_dir + f"constants.pickle", 'wb') as f:

@@ -20,6 +20,7 @@ import h5py
 from scipy.io import loadmat
 import argparse
 from Tecplot_mesh import tecplot_Mesh
+from tqdm import tqdm
 #%%
 class Model(struct.PyTreeNode):
     params: Any
@@ -82,9 +83,9 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
     Q = 0.5 * sum(-np.abs(0.5 * (deriv_mat[:, i, j] + deriv_mat[:, j, i]))**2 +
                   np.abs(0.5 * (deriv_mat[:, i, j] - deriv_mat[:, j, i]))**2 
                   for i in range(3) for j in range(3))
-    return uvwp, vor_mag, Q
+    return uvwp, vor_mag, Q, deriv_mat
 
-def Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_ground, is_mean, model_fn):
+def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
@@ -93,10 +94,29 @@ def Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_g
     # Create the evaluation grid
     gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
     gridbase_n = [gridbase[i].copy()/pos_ref[i] for i in range(len(gridbase))]
+    if order[0] == 0:
+        if order[1] == 1:
+            z_e, y_e, x_e = np.meshgrid(gridbase[-1], gridbase[-2], gridbase[-3], indexing='ij')
+            z_n, y_n, x_n = np.meshgrid(gridbase_n[-1], gridbase_n[-2], gridbase_n[-3], indexing='ij')
+        else:
+            y_e, z_e, x_e = np.meshgrid(gridbase[-2], gridbase[-1], gridbase[-3], indexing='ij')
+            y_n, z_n, x_n = np.meshgrid(gridbase_n[-2], gridbase_n[-1], gridbase_n[-3], indexing='ij')
+    elif order[0] == 1:
+        if order[1] == 0:
+            z_e, x_e, y_e = np.meshgrid(gridbase[-1], gridbase[-3], gridbase[-2], indexing='ij')
+            z_n, x_n, y_n = np.meshgrid(gridbase_n[-1], gridbase_n[-3], gridbase_n[-2], indexing='ij')
+        else:
+            y_e, x_e, z_e = np.meshgrid(gridbase[-2], gridbase[-3], gridbase[-1], indexing='ij')
+            y_n, x_n, z_n = np.meshgrid(gridbase_n[-2], gridbase_n[-3], gridbase_n[-1], indexing='ij')
+    elif order[0] == 2:
+        if order[1] == 0:
+            x_e, z_e, y_e = np.meshgrid(gridbase[-3], gridbase[-1], gridbase[-2], indexing='ij')
+            x_n, z_n, y_n = np.meshgrid(gridbase_n[-3], gridbase_n[-1], gridbase_n[-2], indexing='ij')
+        else:
+            x_e, y_e, z_e = np.meshgrid(gridbase[-3], gridbase[-2], gridbase[-1], indexing='ij')
+            x_n, y_n, z_n = np.meshgrid(gridbase_n[-3], gridbase_n[-2], gridbase_n[-1], indexing='ij')   
 
-    z_e, x_e, y_e = np.meshgrid(gridbase[-1], gridbase[-3], gridbase[-2], indexing='ij')
-    z_n, x_n, y_n = np.meshgrid(gridbase_n[-1], gridbase_n[-3], gridbase_n[-2], indexing='ij')
-    t_n = np.zeros(output_shape[1:]) + gridbase[0][timestep]
+    t_n = np.zeros(output_shape[1:]) + gridbase_n[0][timestep]
     eval_grid = np.concatenate([t_n.reshape(-1,1), x_n.reshape(-1,1), y_n.reshape(-1,1), z_n.reshape(-1,1)], axis=1)
 
     # Load Ground truth data if is_ground is True
@@ -106,33 +126,35 @@ def Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_g
         mean_data = np.load(path + 'mean')
 
     # Evaluate the derivatives
-    uvwp, vor_mag, Q = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
-                             for i in range(0, eval_grid.shape[0], 10000)])
+    uvwp, vor_mag, Q, deriv_mat = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
+                                        for i in tqdm(range(0, eval_grid.shape[0], 10000))])
     
     # Concatenate the results
     uvwp = np.concatenate(uvwp, axis=0)
     vor_mag = np.concatenate(vor_mag, axis=0)
     Q = np.concatenate(Q, axis=0)
+    deriv_mat = np.concatenate(deriv_mat, axis=0)
     uvwp[:,3] = 1.185*(uvwp[:,3] - np.mean(uvwp[:,3]))
+
     if is_ground:
-        grounds = [ground_data['vel'][:,i].reshape(output_shape[1:]) for i in range(3)]
+        grounds = [ground_data[:,i+4].reshape(output_shape[1:]) for i in range(3)]
         errors = [np.sqrt(np.square(uvwp[:,i].reshape(output_shape[1:]) - grounds[i])) for i in range(3)]
-        if 'pre' in list(ground_data.keys()):
-            p_ground = ground_data['pre'].reshape(output_shape[1:])
+        if ground_data.shape[1] > 7:
+            p_ground = ground_data[:,7].reshape(output_shape[1:])
             p_error = np.sqrt(np.square(uvwp[:,3].reshape(output_shape[1:]) - p_ground))
-        if 'temp' in list(ground_data.keys()):
-            temp_ground = ground_data['temp'].reshape(output_shape[1:])
+        if ground_data.shape[1] > 8:
+            temp_ground = ground_data[:,8].reshape(output_shape[1:])
             temp_error = np.sqrt(np.square(uvwp[:,4].reshape(output_shape[1:]) - temp_ground))
     if is_mean:
         means = [mean_data['vel'][:,i].reshape(output_shape[1:]) for i in range(3)]
         flucs = [uvwp[:,i].reshape(output_shape[1:]) - means[i] for i in range(3)]
 
     # Tecplot file generation
-    filename = path + '/Tecplotfile/ts_' + str(timestep) + '.dat'
-    if os.path.isdir(path + '/Tecplotfile'):
+    filename = path + 'Tecplotfile/' + name + '/ts_' + str(timestep) + '.dat'
+    if os.path.isdir(path + 'Tecplotfile/' + name):
         pass
     else:
-        os.mkdir(path + '/Tecplotfile')
+        os.mkdir(path + 'Tecplotfile/' + name)
     X, Y, Z = output_shape[1:]
     vars = [('u_pred[m/s]',np.float32(uvwp[:,0].reshape(-1))), ('v_pred[m/s]',np.float32(uvwp[:,1].reshape(-1))), 
             ('w_pred[m/s]',np.float32(uvwp[:,2].reshape(-1))), ('p_pred[Pa]',np.float32(uvwp[:,3].reshape(-1))),
@@ -141,9 +163,9 @@ def Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_g
         vars += [('u_error[m/s]', np.float32(errors[0].reshape(-1))),
                  ('v_error[m/s]', np.float32(errors[1].reshape(-1))),
                  ('w_error[m/s]', np.float32(errors[2].reshape(-1)))]
-        if 'pre' in list(ground_data.keys()):
+        if ground_data.shape[1] > 7:
             vars += [('p_error[Pa]', np.float32(p_error.reshape(-1)))]
-        if 'temp' in list(ground_data.keys()):
+        if ground_data.shape[1] > 8:
             vars += [('temp_error[K]', np.float32(temp_error.reshape(-1)))]
     if is_mean:
         vars += [('u_fluc[m/s]', np.float32(flucs[0].reshape(-1))),
@@ -152,7 +174,13 @@ def Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_g
     pad = 27
     tecplot_Mesh(filename, X, Y, Z, x_e.reshape(-1), y_e.reshape(-1), z_e.reshape(-1), vars, pad)
 
-    #%%
+    if os.path.isdir(path + 'npyresult/' + name):
+        pass
+    else:
+        print('check')
+        os.mkdir(path + 'npyresult/' + name)
+    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([uvwp, deriv_mat[:,:,0], deriv_mat[:,:,1], deriv_mat[:,:,2]], axis=1))
+#%%
 if __name__ == "__main__":
     from domain import *
     from trackdata import *
@@ -187,6 +215,7 @@ if __name__ == "__main__":
 
     # Get model parameters
     checkpoint_list = sorted(glob(run.c.model_out_dir+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
+
     with open(checkpoint_list[-1],"rb") as f:
         model_params = pickle.load(f)
     all_params, model_fn, train_data = run.test()
@@ -194,9 +223,12 @@ if __name__ == "__main__":
     all_params["network"]["layers"] = from_state_dict(model, model_params).params
     domain_range = data['tecplot_init_kwargs']['domain_range']
     output_shape = data['tecplot_init_kwargs']['out_shape']
+    order = data['tecplot_init_kwargs']['order']
     timestep = data['tecplot_init_kwargs']['timestep']
     is_ground = data['tecplot_init_kwargs']['is_ground']
     path = data['tecplot_init_kwargs']['path']
     is_mean = data['tecplot_init_kwargs']['is_mean']
     path = os.path.dirname(cur_dir) + '/' + path
-    Tecplotfile_gen(path, all_params, domain_range, output_shape, timestep, is_ground, is_mean, model_fn)
+    pos_ref = all_params["domain"]["in_max"].flatten()
+
+    Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)

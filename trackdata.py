@@ -235,6 +235,7 @@ class Data(Database):
         
         return total_bound
     """
+
     @staticmethod
     def train_data(all_params):
         cur_dir = os.getcwd()
@@ -282,11 +283,12 @@ if __name__ == "__main__":
     all_params = {"data":{}, "domain":{}}
 
     cur_dir = os.getcwd()
-    path = '/RBC_G8_DNS/npdata/lv6_xbound/'
-    data_keys = ['pos', 'vel', 'T']
+    #path = '/RBC_G8_DNS/npdata/lv6_xbound/'
+    path = '/ETFS/HIT/train_data/'
+    data_keys = ['pos', 'vel', 'acc', 'p']
     viscosity = 15*10**(-6)
 
-    domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,8), 'z':(0,1)}
+    domain_range = {'t':(0,0.04), 'x':(0,0.1), 'y':(0,0.1), 'z':(0,0.1)}
     grid_size = [51, 200, 200, 200]
     bound_keys = ['ic', 'bcxu', 'bcxl', 'bcyu', 'bcyl', 'bczu', 'bczl']
 

@@ -49,7 +49,7 @@ class Boundary_layer(Equation):
         out_z, out_zz = second_order(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
 
         p_out = model_fns(all_params, particles)                                                                           
-
+        b_out = model_fns(all_params, boundaries[0])
         u = all_params["data"]['u_ref']*out[:,0:1]
         v = all_params["data"]['v_ref']*out[:,1:2]
         w = all_params["data"]['w_ref']*out[:,2:3]
@@ -94,6 +94,15 @@ class Boundary_layer(Equation):
 
         loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
         loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
 
         loss_con = ux + vy + wz
         loss_con = jnp.mean(loss_con**2)

@@ -1,0 +1,4 @@
+path: ETFS/TBL_exp/config/
+temporal_init_kwargs: {'activate': 1}
+behavior_init_kwargs: {'activate': 0, 'timestep': 24}
+tecplot_init_kwargs: {'activate': 0, 'is_ground': 0, 'is_mean': 0, 'path': 'ETFS/TBL_exp/', 'order': (0,1,2), 'out_shape': (51, 444, 22, 103), 'domain_range': {'t': (0, 0.0020920502092050207), 'x': (0.00408219988, 0.05591779839), 'y': (0.0000552874, 0.00251251), 'z': (0.00250878011, 0.01394384064)}, 'timestep': 24}
