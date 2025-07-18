@@ -67,12 +67,13 @@ class PINN(PINNbase):
         # Input data and grids
         grids, all_params = self.c.domain.sampler(all_params)
         train_data, all_params = self.c.data.train_data(all_params)
-        valid_data = self.c.problem.exact_solution(all_params)
+        
+        valid_data = self.c.problem.exact_solution(all_params.copy())
         #model_states = optimiser.init(all_params["network"]["layers"])
         #optimiser_fn = optimiser.update
         #model_fn = c.network.network_fn
         #dynamic_params = all_params["network"].pop("layers")
-
+        print(all_params['data']['u_ref'])
         # Input key initialization
         key, batch_key = random.split(key)
         num_keysplit = 10
@@ -147,7 +148,7 @@ class PINN(PINNbase):
             if 'T' in valid_data.keys():
                 e_batch_T = random.choice(e_key, valid_data['T'], shape = (self.c.optimization_init_kwargs["e_batch"],))
             v_pred = model_fns(all_params, e_batch_pos)
-        
+            print(all_params["data"]['u_ref'])
             u_error = jnp.sqrt(jnp.mean((all_params["data"]["u_ref"]*v_pred[:,0:1] - e_batch_vel[:,0:1])**2)/jnp.mean(e_batch_vel[:,0:1]**2))
             v_error = jnp.sqrt(jnp.mean((all_params["data"]["v_ref"]*v_pred[:,1:2] - e_batch_vel[:,1:2])**2)/jnp.mean(e_batch_vel[:,1:2]**2))
             w_error = jnp.sqrt(jnp.mean((all_params["data"]["w_ref"]*v_pred[:,2:3] - e_batch_vel[:,2:3])**2)/jnp.mean(e_batch_vel[:,2:3]**2))

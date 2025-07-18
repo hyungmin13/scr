@@ -50,7 +50,6 @@ class ConstantsBase:
         if os.path.exists(os.path.dirname(self.summary_out_dir)):
             pass
         else:
-            print('check')
             print(os.path.dirname(self.summary_out_dir))
             os.mkdir(os.path.dirname(self.summary_out_dir))
         with open(self.summary_out_dir + f"constants.txt", 'w') as f:

@@ -1,6 +1,6 @@
 run: ETFS/HIT/config/HIT_SOAP_k1/
 domain_init_kwargs: {'domain_range': {'t': (0, 0.04), 'x': (0, 0.1), 'y': (0, 0.1), 'z': (0, 0.1)}, 'grid_size': [51, 5120, 5120, 5120], 'bound_keys': ['bczl']}
-data_init_kwargs: {'path': '/ETFS/HIT/train_data/lv1/', 'data_keys': ['pos', 'vel',], 'viscosity': 1.5e-05}
+data_init_kwargs: {'path': '/ETFS/HIT/train_data/lv1/', 'data_keys': ['pos', 'vel',], 'viscosity': 1.5e-05, 'u_ref': 1.5, 'v_ref': 1.5, 'w_ref': 0.9, 'p_ref': 1.5}
 network_init_kwargs: {'key': 0, 'layer_sizes': [4, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 4], 'network_name': 'MLP'}
 problem_init_kwargs: {'loss_weights': (1.0, 1.0, 1.0, 1e-06, 1e-06, 1e-06, 1e-06), 'path_s': '/ETFS/HIT/ground/'}
 optimization_init_kwargs: {'optimiser': 'soap', 'learning_rate': 0.001, 'decay_step': 16000, 'decay_rate': 0.9, 'n_steps': 100000000, 'save_step': 20000, 'p_batch': 10000, 'e_batch': 10000, 'b_batch': 10000}

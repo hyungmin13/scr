@@ -273,8 +273,7 @@ class Data(Database):
         for j in range(len(data_keys)): datas[data_keys[j]] = np.concatenate(datas[data_keys[j]], 0, dtype=np.float64)
         datas = Data.domain_filter(datas, data_keys, domain_range)
         train_data = Data.input_normalize(all_params, datas)
-        all_params = Data.output_normalize(all_params, train_data)
-
+        #all_params = Data.output_normalize(all_params, train_data)
         return train_data, all_params
     
 
@@ -284,17 +283,24 @@ if __name__ == "__main__":
 
     cur_dir = os.getcwd()
     #path = '/RBC_G8_DNS/npdata/lv6_xbound/'
-    path = '/ETFS/HIT/train_data/'
+    path = '/ETFS/HIT/train_data/lv1/'
     data_keys = ['pos', 'vel', 'acc', 'p']
     viscosity = 15*10**(-6)
 
     domain_range = {'t':(0,0.04), 'x':(0,0.1), 'y':(0,0.1), 'z':(0,0.1)}
     grid_size = [51, 200, 200, 200]
     bound_keys = ['ic', 'bcxu', 'bcxl', 'bcyu', 'bcyl', 'bczu', 'bczl']
-
+    u_ref = 1.5
+    v_ref = 1.5
+    w_ref = 0.9
+    p_ref = 1.5
     all_params["data"] = Data.init_params(path = path, 
                                           data_keys = data_keys, 
-                                          viscosity = viscosity)
+                                          viscosity = viscosity,
+                                          u_ref = u_ref,
+                                          v_ref = v_ref,
+                                          w_ref = w_ref,
+                                          p_ref = p_ref)
     all_params["domain"] = Domain.init_params(domain_range = domain_range, 
                                               bound_keys = bound_keys,
                                               grid_size = grid_size)

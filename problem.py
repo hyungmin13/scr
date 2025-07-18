@@ -26,6 +26,7 @@ class Problem(Problembase):
         path_s = all_params["problem"]["path_s"]
         data_keys = all_params["data"]["data_keys"]
         viscosity = all_params["data"]["viscosity"]
+        u_ref = all_params["data"]["u_ref"]
         all_params["data"] = Data.init_params(path = path_s, data_keys = data_keys, 
                                               viscosity = viscosity)
 
