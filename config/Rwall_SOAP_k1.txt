@@ -2,6 +2,6 @@ run: ETFS/TBL_exp/config/Rwall_SOAP_k1/
 domain_init_kwargs: {'domain_range': {'t': (0, 0.0020920502092050207), 'x': (0, 0.058), 'y': (0, 0.00321), 'z': (0, 0.0171)}, 'grid_size': [51, 2800, 212, 600], 'bound_keys': ['bcyl']}
 data_init_kwargs: {'path': '/ETFS/TBL_exp/train_data/lv1/', 'data_keys': ['pos', 'vel',], 'viscosity': 1.5e-05}
 network_init_kwargs: {'key': 0, 'layer_sizes': [4, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 4], 'network_name': 'MLP'}
-problem_init_kwargs: {'loss_weights': (1.0, 1.0, 1.0, 1e-06, 1e-06, 1e-06, 1e-06), 'path_s': '/ETFS/TBL_exp/train_data/validate/'}
-optimization_init_kwargs: {'optimiser': 'soap', 'learning_rate': 0.001, 'decay_step': 16000, 'decay_rate': 0.9, 'n_steps': 100000000, 'save_step': 200, 'p_batch': 10000, 'e_batch': 10000, 'b_batch': 10000}
+problem_init_kwargs: {'loss_weights': (1.0, 1.0, 1.0, 1e-07, 1e-08, 1e-08, 1e-08, 0.0001), 'path_s': '/ETFS/TBL_exp/train_data/validate/'}
+optimization_init_kwargs: {'optimiser': 'soap', 'learning_rate': 0.001, 'decay_step': 16000, 'decay_rate': 0.9, 'n_steps': 100000000, 'save_step': 20000, 'p_batch': 10000, 'e_batch': 10000, 'b_batch': 10000}
 equation_init_kwargs: {'equation': 'Boundary_layer',}
