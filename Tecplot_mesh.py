@@ -1,3 +1,4 @@
+import numpy as np
 def tecplot_Mesh(filename, X, Y, Z, x, y, z, vars, fw):
     #filename: path + *.dat  / X, Y, Z : data shape / x, y, z : (-1) numpy array  /  
     #vars : list or tuple object containing (-1) size numpy array and id number  /  fw : object length - ex) fw9 for type double
@@ -27,7 +28,7 @@ def tecplot_Mesh(filename, X, Y, Z, x, y, z, vars, fw):
     f.write(', F=POINT\n')
     id = 0
     for i in range(vars[0][1].shape[0]):
-        f.write(pad(str(x[i]),fw) + pad(str(y[i]),fw) + pad(str(z[i]),fw))
+        f.write(pad(str(np.float32(x[i])),fw) + pad(str(np.float32(y[i])),fw) + pad(str(np.float32(z[i])),fw))
         f.write(varline(vars, id, fw))
         id = id + 1
 
