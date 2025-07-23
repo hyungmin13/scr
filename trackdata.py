@@ -273,7 +273,7 @@ class Data(Database):
         for j in range(len(data_keys)): datas[data_keys[j]] = np.concatenate(datas[data_keys[j]], 0, dtype=np.float64)
         datas = Data.domain_filter(datas, data_keys, domain_range)
         train_data = Data.input_normalize(all_params, datas)
-        #all_params = Data.output_normalize(all_params, train_data)
+        all_params = Data.output_normalize(all_params, train_data)
         return train_data, all_params
     
 
