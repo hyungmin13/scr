@@ -134,7 +134,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
     vor_mag = np.concatenate(vor_mag, axis=0)
     Q = np.concatenate(Q, axis=0)
     deriv_mat = np.concatenate(deriv_mat, axis=0)
-    uvwp[:,3] = 1.185*(uvwp[:,3] - np.mean(uvwp[:,3]))
+    uvwp[:,3] = uvwp[:,3] - np.mean(uvwp[:,3])
 
     if is_ground:
         grounds = [ground_data[:,i+4].reshape(output_shape[1:]) for i in range(3)]
