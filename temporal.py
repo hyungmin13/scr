@@ -119,10 +119,10 @@ def temporal_error(path, foldername, all_params, domain_range, output_shape, ord
             u_error_list.append(np.linalg.norm(uvwp[:,0].reshape(-1,1) - grounds[0])/np.linalg.norm(V_mag))
             v_error_list.append(np.linalg.norm(uvwp[:,1].reshape(-1,1) - grounds[1])/np.linalg.norm(V_mag))
             w_error_list.append(np.linalg.norm(uvwp[:,2].reshape(-1,1) - grounds[2])/np.linalg.norm(V_mag))
-            if ground_data.shape[1] > 7:
+            if uvwp.shape[1] > 3:
                 p_ground = ground_data[:,7].reshape(-1,1) - np.mean(ground_data[:,7])
                 pre_error_list.append(np.linalg.norm(uvwp[:,3].reshape(-1,1) - p_ground)/np.linalg.norm(p_ground))
-            if ground_data.shape[1] > 8:
+            if uvwp.shape[1] > 4:
                 temp_ground = ground_data[:,8].reshape(-1,1)
                 temp_error_list.append(np.linalg.norm(uvwp[:,4].reshape(-1,1) - temp_ground)/np.linalg.norm(temp_ground))
         if is_mean:
