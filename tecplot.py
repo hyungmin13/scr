@@ -115,10 +115,10 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
         else:
             x_e, y_e, z_e = np.meshgrid(gridbase[-3], gridbase[-2], gridbase[-1], indexing='ij')
             x_n, y_n, z_n = np.meshgrid(gridbase_n[-3], gridbase_n[-2], gridbase_n[-1], indexing='ij')   
-
+    t_e = np.zeros(output_shape[0]) + gridbase[0][timestep]
     t_n = np.zeros(output_shape[1:]) + gridbase_n[0][timestep]
     eval_grid = np.concatenate([t_n.reshape(-1,1), x_n.reshape(-1,1), y_n.reshape(-1,1), z_n.reshape(-1,1)], axis=1)
-
+    eval_grid_e = np.concatenate([t_e.reshape(-1,1), x_e.reshape(-1,1), y_e.reshape(-1,1), z_e.reshape(-1,1)], axis=1)
     # Load Ground truth data if is_ground is True
     if is_ground:
         ground_data = np.load(path + 'ground/ts_' + str(timestep).zfill(2) + '.npy')
@@ -179,7 +179,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
     else:
         print('check')
         os.mkdir(path + 'npyresult/' + name)
-    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([uvwp, deriv_mat[:,:,0], deriv_mat[:,:,1], deriv_mat[:,:,2]], axis=1))
+    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([eval_grid_e, uvwp, deriv_mat[:,:,0], deriv_mat[:,:,1], deriv_mat[:,:,2]], axis=1))
 #%%
 if __name__ == "__main__":
     from domain import *
