@@ -224,11 +224,11 @@ if __name__ == "__main__":
     domain_range = data['tecplot_init_kwargs']['domain_range']
     output_shape = data['tecplot_init_kwargs']['out_shape']
     order = data['tecplot_init_kwargs']['order']
-    timestep = data['tecplot_init_kwargs']['timestep']
+    timesteps = data['tecplot_init_kwargs']['timestep']
     is_ground = data['tecplot_init_kwargs']['is_ground']
     path = data['tecplot_init_kwargs']['path']
     is_mean = data['tecplot_init_kwargs']['is_mean']
     path = os.path.dirname(cur_dir) + '/' + path
     pos_ref = all_params["domain"]["in_max"].flatten()
-
-    Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)
+    for timestep in timesteps:
+        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)
