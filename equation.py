@@ -773,10 +773,10 @@ class Energy(Equation):
         loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
         loss_w = jnp.mean(loss_w**2)
 
-        loss_T_bu = all_params["data"]['T_ref']*b_out1[:,4:5] - all_params["data"]['T_ref']
+        loss_T_bu = all_params["data"]['T_ref']*b_out1[:,4:5] + all_params["data"]['T_ref']
         loss_T_bu = jnp.mean(loss_T_bu**2)
         
-        loss_T_bb = all_params["data"]['T_ref']*b_out2[:,4:5] + all_params["data"]['T_ref']
+        loss_T_bb = all_params["data"]['T_ref']*b_out2[:,4:5] - all_params["data"]['T_ref']
         loss_T_bb = jnp.mean(loss_T_bb**2)
 
         loss_con = ux + vy + wz

@@ -31,7 +31,6 @@ class Model(struct.PyTreeNode):
 class PINNbase:
     def __init__(self,c):
         c.get_outdirs()
-        c.save_constants_file()
         self.c=c
 
 class PINN(PINNbase):
