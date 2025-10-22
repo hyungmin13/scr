@@ -223,8 +223,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
         os.mkdir(path + 'Tecplotfile/' + name)
     X, Y, Z = output_shape[1:]
     vars = [('u_pred[m/s]',np.float32(uvwp[:,0].reshape(-1))), ('v_pred[m/s]',np.float32(uvwp[:,1].reshape(-1))), 
-            ('w_pred[m/s]',np.float32(uvwp[:,2].reshape(-1))), ('p_pred[Pa]',np.float32(uvwp[:,3].reshape(-1))),
-            ('Q[1/s^2]', np.float32(Q.reshape(-1)))]
+            ('w_pred[m/s]',np.float32(uvwp[:,2].reshape(-1))), ('p_pred[Pa]',np.float32(uvwp[:,3].reshape(-1)))]
     if is_ground:
         vars += [('u_error[m/s]', np.float32(errors[0].reshape(-1))),
                  ('v_error[m/s]', np.float32(errors[1].reshape(-1))),
