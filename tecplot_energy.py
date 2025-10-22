@@ -150,7 +150,7 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
          - uzts[:,0:1] + uxts[:,2:3] - uvwp[:,0:1]*(uxzs[:,0:1] - uxxs[:,2:3]) - uvwp[:,1:2]*(uyzs[:,0:1] - uxys[:,2:3]) - uvwp[:,2:3]*(uzzs[:,0:1] - uxzs[:,2:3])
     return uvwp, uxs[:,4:5], uys[:,4:5], Tx, Ty
 
-def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
+def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn):
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
@@ -180,8 +180,8 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
         else:
             x_e, y_e, z_e = np.meshgrid(gridbase[-3], gridbase[-2], gridbase[-1], indexing='ij')
             x_n, y_n, z_n = np.meshgrid(gridbase_n[-3], gridbase_n[-2], gridbase_n[-1], indexing='ij')   
-    t_e = np.zeros(output_shape[1:]) + gridbase[0][timestep]
-    t_n = np.zeros(output_shape[1:]) + gridbase_n[0][timestep]
+    t_e = np.zeros(output_shape[1:]) + time_n[timestep]*pos_ref[0]
+    t_n = np.zeros(output_shape[1:]) + time_n[timestep]
     eval_grid = np.concatenate([t_n.reshape(-1,1), x_n.reshape(-1,1), y_n.reshape(-1,1), z_n.reshape(-1,1)], axis=1)
     eval_grid_e = np.concatenate([t_e.reshape(-1,1), x_e.reshape(-1,1), y_e.reshape(-1,1), z_e.reshape(-1,1)], axis=1)
     # Load Ground truth data if is_ground is True
@@ -297,4 +297,4 @@ if __name__ == "__main__":
     path = os.path.dirname(cur_dir) + '/' + path
     pos_ref = all_params["domain"]["in_max"].flatten()
     for timestep in timesteps:
-        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)
+        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn)
