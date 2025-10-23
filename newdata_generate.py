@@ -150,46 +150,14 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
          - uzts[:,0:1] + uxts[:,2:3] - uvwp[:,0:1]*(uxzs[:,0:1] - uxxs[:,2:3]) - uvwp[:,1:2]*(uyzs[:,0:1] - uxys[:,2:3]) - uvwp[:,2:3]*(uzzs[:,0:1] - uxzs[:,2:3])
     return uvwp, uxs[:,4:5], uys[:,4:5], Tx, Ty
 
-def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn):
+def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, train_data, time_n, model_fn):
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
     dynamic_params = all_params["network"].pop("layers")
-
-    # Create the evaluation grid
-    gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
-    gridbase_n = [gridbase[i].copy()/pos_ref[i] for i in range(len(gridbase))]
-    if order[0] == 0:
-        if order[1] == 1:
-            z_e, y_e, x_e = np.meshgrid(gridbase[-1], gridbase[-2], gridbase[-3], indexing='ij')
-            z_n, y_n, x_n = np.meshgrid(gridbase_n[-1], gridbase_n[-2], gridbase_n[-3], indexing='ij')
-        else:
-            y_e, z_e, x_e = np.meshgrid(gridbase[-2], gridbase[-1], gridbase[-3], indexing='ij')
-            y_n, z_n, x_n = np.meshgrid(gridbase_n[-2], gridbase_n[-1], gridbase_n[-3], indexing='ij')
-    elif order[0] == 1:
-        if order[1] == 0:
-            z_e, x_e, y_e = np.meshgrid(gridbase[-1], gridbase[-3], gridbase[-2], indexing='ij')
-            z_n, x_n, y_n = np.meshgrid(gridbase_n[-1], gridbase_n[-3], gridbase_n[-2], indexing='ij')
-        else:
-            y_e, x_e, z_e = np.meshgrid(gridbase[-2], gridbase[-3], gridbase[-1], indexing='ij')
-            y_n, x_n, z_n = np.meshgrid(gridbase_n[-2], gridbase_n[-3], gridbase_n[-1], indexing='ij')
-    elif order[0] == 2:
-        if order[1] == 0:
-            x_e, z_e, y_e = np.meshgrid(gridbase[-3], gridbase[-1], gridbase[-2], indexing='ij')
-            x_n, z_n, y_n = np.meshgrid(gridbase_n[-3], gridbase_n[-1], gridbase_n[-2], indexing='ij')
-        else:
-            x_e, y_e, z_e = np.meshgrid(gridbase[-3], gridbase[-2], gridbase[-1], indexing='ij')
-            x_n, y_n, z_n = np.meshgrid(gridbase_n[-3], gridbase_n[-2], gridbase_n[-1], indexing='ij')   
-    t_e = np.zeros(output_shape[1:]) + time_n[timestep]*pos_ref[0]
-    t_n = np.zeros(output_shape[1:]) + time_n[timestep]
-    eval_grid = np.concatenate([t_n.reshape(-1,1), x_n.reshape(-1,1), y_n.reshape(-1,1), z_n.reshape(-1,1)], axis=1)
-    eval_grid_e = np.concatenate([t_e.reshape(-1,1), x_e.reshape(-1,1), y_e.reshape(-1,1), z_e.reshape(-1,1)], axis=1)
-    # Load Ground truth data if is_ground is True
-    if is_ground:
-        ground_data = np.load(path + 'ground/ts_' + str(timestep).zfill(2) + '.npy')
-    if is_mean:
-        mean_data = np.load(path + 'mean')
-
+    counts = np.unique(train_data['pos'][:,0], return_counts=True)[1]
+    eval_grid = train_data['pos'][np.sum(counts[:timestep]):np.sum(counts[:timestep+1]),:]
+    eval_grid_e = [eval_grid.copy()*pos_ref[i] for i in range(4)]
     # Evaluate the derivatives
     uvwp, Txo, Tyo, Tx, Ty = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
                                         for i in range(0, eval_grid.shape[0], 10000)])
@@ -201,50 +169,13 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
     Tx = np.concatenate(Tx, axis=0)
     Ty = np.concatenate(Ty, axis=0)
     uvwp[:,3] = uvwp[:,3] - np.mean(uvwp[:,3])
-
-    if is_ground:
-        grounds = [ground_data[:,i+4].reshape(output_shape[1:]) for i in range(3)]
-        errors = [np.sqrt(np.square(uvwp[:,i].reshape(output_shape[1:]) - grounds[i])) for i in range(3)]
-        if ground_data.shape[1] > 7:
-            p_ground = ground_data[:,7].reshape(output_shape[1:])
-            p_error = np.sqrt(np.square(uvwp[:,3].reshape(output_shape[1:]) - p_ground))
-        if ground_data.shape[1] > 8:
-            temp_ground = ground_data[:,8].reshape(output_shape[1:])
-            temp_error = np.sqrt(np.square(uvwp[:,4].reshape(output_shape[1:]) - temp_ground))
-    if is_mean:
-        means = [mean_data['vel'][:,i].reshape(output_shape[1:]) for i in range(3)]
-        flucs = [uvwp[:,i].reshape(output_shape[1:]) - means[i] for i in range(3)]
-
-    # Tecplot file generation
-    filename = path + 'Tecplotfile/' + name + '/ts_' + str(timestep) + '.dat'
-    if os.path.isdir(path + 'Tecplotfile/' + name):
-        pass
-    else:
-        os.mkdir(path + 'Tecplotfile/' + name)
-    X, Y, Z = output_shape[1:]
-    vars = [('u_pred[m/s]',np.float32(uvwp[:,0].reshape(-1))), ('v_pred[m/s]',np.float32(uvwp[:,1].reshape(-1))), 
-            ('w_pred[m/s]',np.float32(uvwp[:,2].reshape(-1))), ('p_pred[Pa]',np.float32(uvwp[:,3].reshape(-1)))]
-    if is_ground:
-        vars += [('u_error[m/s]', np.float32(errors[0].reshape(-1))),
-                 ('v_error[m/s]', np.float32(errors[1].reshape(-1))),
-                 ('w_error[m/s]', np.float32(errors[2].reshape(-1)))]
-        if ground_data.shape[1] > 7:
-            vars += [('p_error[Pa]', np.float32(p_error.reshape(-1)))]
-        if ground_data.shape[1] > 8:
-            vars += [('temp_error[K]', np.float32(temp_error.reshape(-1)))]
-    if is_mean:
-        vars += [('u_fluc[m/s]', np.float32(flucs[0].reshape(-1))),
-                 ('v_fluc[m/s]', np.float32(flucs[1].reshape(-1))),
-                 ('w_fluc[m/s]', np.float32(flucs[2].reshape(-1)))]
-    pad = 27
-    #tecplot_Mesh(filename, X, Y, Z, x_e.reshape(-1), y_e.reshape(-1), z_e.reshape(-1), vars, pad)
-
-    if os.path.isdir(path + 'npyresult/' + name):
+    timestep_new = timestep + 170
+    if os.path.isdir(path + '/' + name):
         pass
     else:
         print('check')
-        os.mkdir(path + 'npyresult/' + name)
-    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([eval_grid_e, uvwp, Txo, Tyo, Tx, Ty], axis=1))
+        os.mkdir(path + 'npydata/lv6_T')
+    np.save(path + 'npdata/lv6_T/' + f'/flow0_{timestep_new:03d}' + '.npy', np.concatenate([eval_grid_e, train_data['vel'], Tx, Ty], axis=1))
 #%%
 if __name__ == "__main__":
     from domain import *
@@ -296,4 +227,4 @@ if __name__ == "__main__":
     path = os.path.dirname(cur_dir) + '/' + path
     pos_ref = all_params["domain"]["in_max"].flatten()
     for timestep in timesteps:
-        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn)
+        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, train_data, time_n, model_fn)
