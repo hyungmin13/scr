@@ -55,6 +55,7 @@ class PINN(PINNbase):
                                              self.c.optimization_init_kwargs["decay_rate"],)
         optimiser = self.c.optimization_init_kwargs["optimiser"](learning_rate=learn_rate, b1=0.95, b2=0.95,
                                                                  weight_decay=0.01, precondition_frequency=5)
+        #optimiser = self.c.optimization_init_kwargs["optimiser"](learning_rate=learn_rate)
         model_states = optimiser.init(all_params["network"]["layers"])
         optimiser_fn = optimiser.update
         model_fn = c.network.network_fn
@@ -73,7 +74,7 @@ class PINN(PINNbase):
         #optimiser_fn = optimiser.update
         #model_fn = c.network.network_fn
         #dynamic_params = all_params["network"].pop("layers")
-        print(all_params['data']['u_ref'])
+
         # Input key initialization
         key, batch_key = random.split(key)
         num_keysplit = 10
