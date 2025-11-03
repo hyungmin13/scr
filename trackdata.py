@@ -31,7 +31,7 @@ class Data(Database):
     @staticmethod
     def data_load_npy(filename, data_keys):
         data = np.load(filename)
-        cols = {'pos':4, 'vel':3, 'p':1, 'T':1, 'T_x':1, 'T_y':1, 'acc':3, 'wall_pos':4, 'wall_T':1}
+        cols = {'pos':4, 'vel':3, 'p':1, 'T':1, 'T_x':1, 'T_y':1, 'acc':3}
         required_keys = ['pos', 'vel']
         for required_key in required_keys:
             if required_key not in data_keys:
@@ -43,7 +43,19 @@ class Data(Database):
                 all_data[col] = data[:,idx:idx+cols[col]]
                 idx += cols[col]
         return all_data
-
+    
+    @staticmethod
+    def data_load_wall(filename, data_keys):
+        data = np.load(filename)
+        cols = {'pos':4, 'T_z':1, 'T':1}
+        all_data = {}
+        idx = 0
+        for col in cols.keys():
+            if col in data_keys:
+                all_data[col] = data[:,idx:idx+cols[col]]
+                idx += cols[col]
+        return all_data
+            
     @staticmethod
     def domain_filter(all_data_, data_keys, domain_range):
         index = np.where((all_data_['pos'][:,1]>=domain_range['x'][0])&(all_data_['pos'][:,1]<=domain_range['x'][1])&
@@ -78,7 +90,6 @@ class Data(Database):
         #bound_keys = all_params["data"]["bound_keys"]
 
         filenames = sorted(glob(os.path.dirname(cur_dir)+path+'*.npy'))
-
         datas = {data_keys[i]:[] for i in range(len(data_keys))}
 
         seed_number = np.arange(0,1000)
@@ -87,21 +98,6 @@ class Data(Database):
 
         for t, filename in enumerate(filenames):
             all_data_ = Data.data_load_npy(filename, data_keys)
-            """    
-            if "bound_keys" in list(all_params["data"].keys()):
-                np.random.seed(seeds[t])
-                total_bound = Data.bound_sampler(all_params, domain_range, seeds[t], all_params["data"]['bound_numbers'], time = all_data_['pos'][0,0])
-                for bound_key in bound_keys:
-                    all_data_['pos'] = np.concatenate([all_data_['pos'], total_bound[bound_key][:,0:4]], 0)
-                    all_data_['vel'] = np.concatenate([all_data_['vel'], total_bound[bound_key][:,4:7]], 0)
-                    if 'acc' in data_keys:
-                        all_data_['acc'] = np.concatenate([all_data_['acc'], total_bound[bound_key][:,7:10]], 0)
-                        if 'T' in data_keys:
-                            all_data_['T'] = np.concatenate([all_data_['T'], total_bound[bound_key][:,10:11]], 0)
-                    else:
-                        if 'T' in data_keys:
-                            all_data_['T'] = np.concatenate([all_data_['T'], total_bound[bound_key][:,7:8]], 0)                        
-            """
             for i in range(len(data_keys)): datas[data_keys[i]].append(all_data_[data_keys[i]])
         for j in range(len(data_keys)): datas[data_keys[j]] = np.concatenate(datas[data_keys[j]], 0, dtype=np.float64)
         datas = Data.domain_filter(datas, data_keys, domain_range)
@@ -109,18 +105,36 @@ class Data(Database):
         all_params = Data.output_normalize(all_params, train_data)
         return train_data, all_params
     
-
+    @staticmethod
+    def wall_data(all_params):
+        cur_dir = os.getcwd()
+        path_w = all_params["data"]["path_w"]
+        domain_range = all_params["domain"]["domain_range"]
+        data_keys = all_params["data"]["wall_keys"]
+        filenames = sorted(glob(os.path.dirname(cur_dir)+path_w+'*.npy'))
+        datas = {data_keys[i]:[] for i in range(len(data_keys))}
+        for t, filename in enumerate(filenames):
+            all_data_ = Data.data_load_wall(filename, data_keys)
+            for i in range(len(data_keys)): datas[data_keys[i]].append(all_data_[data_keys[i]])
+        for j in range(len(data_keys)): datas[data_keys[j]] = np.concatenate(datas[data_keys[j]], 0, dtype=np.float64)
+        datas = Data.domain_filter(datas, data_keys, domain_range)
+        arg_keys = ['t', 'x', 'y']
+        for i in range(datas['pos'].shape[1]-1):
+            datas['pos'][:,i] = datas['pos'][:,i]/domain_range[arg_keys[i]][1]
+        return datas
+        
 if __name__ == "__main__":
     from domain import *
     all_params = {"data":{}, "domain":{}}
 
     cur_dir = os.getcwd()
     #path = '/RBC_G8_DNS/npdata/lv6_xbound/'
-    path = '/RBC_G8_DNS/npdata/lv6_T/'
-    data_keys = ['pos', 'vel', 'T', 'T_x', 'T_y']
+    path = '/Cooling/npdata/lv6/'
+    path_w = '/Cooling/npdata/wall_data/'
+    data_keys = ['pos', 'vel',]
+    wall_keys = ['pos', 'T', 'T_z']
     viscosity = 15*10**(-6)
-
-    domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,8), 'z':(0,8)}
+    domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,3), 'z':(0,0.5)}
     grid_size = [51, 200, 200, 200]
     bound_keys = ['ic', 'bcxu', 'bcxl', 'bcyu', 'bcyl', 'bczu', 'bczl']
     u_ref = 1.5
@@ -128,7 +142,9 @@ if __name__ == "__main__":
     w_ref = 0.9
     p_ref = 1.5
     all_params["data"] = Data.init_params(path = path, 
+                                          path_w = path_w,
                                           data_keys = data_keys, 
+                                          wall_keys = wall_keys,
                                           viscosity = viscosity,
                                           u_ref = u_ref,
                                           v_ref = v_ref,
@@ -139,3 +155,4 @@ if __name__ == "__main__":
                                               grid_size = grid_size)
     
     train_data, all_params = Data.train_data(all_params)
+    wall_data = Data.wall_data(all_params.copy())

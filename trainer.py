@@ -68,7 +68,9 @@ class PINN(PINNbase):
         # Input data and grids
         grids, all_params = self.c.domain.sampler(all_params)
         train_data, all_params = self.c.data.train_data(all_params)
-        
+        if 'path_w' in all_params['data'].keys():
+            print('wall data detected')
+            wall_data = self.c.data.wall_data(all_params.copy())
         valid_data = self.c.problem.exact_solution(all_params.copy())
         #model_states = optimiser.init(all_params["network"]["layers"])
         #optimiser_fn = optimiser.update
@@ -103,31 +105,64 @@ class PINN(PINNbase):
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                 for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
+        
+        if 'path_w' in all_params['data'].keys():
+            w_batch = random.choice(keys_next[0],wall_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+            wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
 
+            b_batches.append(w_batch)
+            b_batches.append(wT_batch)
         # Initializing the update function
         update = PINN_update.lower(model_states, optimiser_fn, equation_fn, dynamic_params, static_params, static_keys, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
-        
-        # Training loop
-        for i in range(self.c.optimization_init_kwargs["n_steps"]):
-            keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-            p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            g_batch = jnp.stack([random.choice(keys_next[k+1], 
-                                            grids['eqns'][arg], 
-                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
-                                for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-            b_batches = []
-            for b_key in all_params["domain"]["bound_keys"]:
-                b_batch = jnp.stack([random.choice(keys_next[k+5], 
-                                                grids[b_key][arg], 
+        if 'path_w' in all_params['data'].keys():
+            # Training loop
+            for i in range(self.c.optimization_init_kwargs["n_steps"]):
+                keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
+                p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                g_batch = jnp.stack([random.choice(keys_next[k+1], 
+                                                grids['eqns'][arg], 
                                                 shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                     for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-                b_batches.append(b_batch)
-            lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
-        
-        
-            self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
-            self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
+                w_batch = random.choice(keys_next[0],wall_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                b_batches = []
+                for b_key in all_params["domain"]["bound_keys"]:
+                    b_batch = jnp.stack([random.choice(keys_next[k+5], 
+                                                    grids[b_key][arg], 
+                                                    shape=(self.c.optimization_init_kwargs["e_batch"],)) 
+                                        for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+                    b_batches.append(b_batch)
+                b_batches.append(w_batch)
+                b_batches.append(wT_batch)
+
+                lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
+            
+            
+                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+                self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
+        else:
+            # Training loop
+            for i in range(self.c.optimization_init_kwargs["n_steps"]):
+                keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
+                p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                g_batch = jnp.stack([random.choice(keys_next[k+1], 
+                                                grids['eqns'][arg], 
+                                                shape=(self.c.optimization_init_kwargs["e_batch"],)) 
+                                    for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+                b_batches = []
+                for b_key in all_params["domain"]["bound_keys"]:
+                    b_batch = jnp.stack([random.choice(keys_next[k+5], 
+                                                    grids[b_key][arg], 
+                                                    shape=(self.c.optimization_init_kwargs["e_batch"],)) 
+                                        for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+                    b_batches.append(b_batch)
+                lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
+            
+            
+                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+                self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
 
     def save_model(self, i, dynamic_params, all_params, save_step, model_fns):
         model_save = (i % save_step == 0)
@@ -149,18 +184,18 @@ class PINN(PINNbase):
             if 'T' in valid_data.keys():
                 e_batch_T = random.choice(e_key, valid_data['T'], shape = (self.c.optimization_init_kwargs["e_batch"],))
             v_pred = model_fns(all_params, e_batch_pos)
-            print(all_params["data"]['u_ref'])
+
             u_error = jnp.sqrt(jnp.mean((all_params["data"]["u_ref"]*v_pred[:,0:1] - e_batch_vel[:,0:1])**2)/jnp.mean(e_batch_vel[:,0:1]**2))
             v_error = jnp.sqrt(jnp.mean((all_params["data"]["v_ref"]*v_pred[:,1:2] - e_batch_vel[:,1:2])**2)/jnp.mean(e_batch_vel[:,1:2]**2))
             w_error = jnp.sqrt(jnp.mean((all_params["data"]["w_ref"]*v_pred[:,2:3] - e_batch_vel[:,2:3])**2)/jnp.mean(e_batch_vel[:,2:3]**2))
-            if v_pred.shape[1] == 5:
-                T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
+            #if v_pred.shape[1] == 5:
+            #    T_error = jnp.sqrt(jnp.mean((all_params["data"]["T_ref"]*v_pred[:,4] - e_batch_T)**2)/jnp.mean(e_batch_T**2))
 
             Losses = report_fn(dynamic_params, all_params, g_batch, p_batch, v_batch, b_batch, model_fns)
             if v_pred.shape[1] == 5:
-                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}} T_error : {T_error:<{12}.{5}}")
+                print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
-                    f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}} {T_error:<{12}.{5}}\n")
+                    f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}}\n")
             else:
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
