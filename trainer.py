@@ -95,6 +95,12 @@ class PINN(PINNbase):
         p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
         v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
         grids['eqns']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bcxu']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bcxl']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bcyu']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bcyl']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bczu']['t'] = np.unique(train_data['pos'][:,0])
+        grids['bczu']['t'] = np.unique(train_data['pos'][:,0])
         g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                            grids['eqns'][arg], 
                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
@@ -106,7 +112,12 @@ class PINN(PINNbase):
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                 for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
-        
+        print(b_batches[0])
+        print(b_batches[1])
+        print(b_batches[2])
+        print(b_batches[3])
+        print(b_batches[4])
+        print(b_batches[5])
         if 'path_w' in all_params['data'].keys():
             w_batch = random.choice(keys_next[0],wall_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
             wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
