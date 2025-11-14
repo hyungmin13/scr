@@ -74,6 +74,97 @@ def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns
     out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
     return out_xx, out_xxx
 
+def jvp1(params, X, e, model_fns):
+    return jax.vmap(lambda x: jax.jvp(lambda y: model_fns(params, y),
+                                      (x,), (e,)))(X)
+
+# 2차
+def jvp2(params, X, e1, e2, model_fns):
+    def g(y): return jax.jvp(lambda z: model_fns(params, z), (y,), (e1,))[1]
+    return jax.vmap(lambda x: jax.jvp(g, (x,), (e2,)))(X)
+
+# 3차
+def jvp3(params, X, e1, e2, e3, model_fns):
+    def g1(y): return jax.jvp(lambda z: model_fns(params, z), (y,), (e1,))[1]
+    def g2(y): return jax.jvp(g1, (y,), (e2,))[1]
+    return jax.vmap(lambda x: jax.jvp(g2, (x,), (e3,)))(X)
+
+def Derivatives2(dynamic_params, all_params, g_batch, model_fns):
+    keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+
+    all_params["network"]["layers"] = dynamic_params
+    out_xx, out_xxx = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
+    out_xy, out_xxy = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
+    out_xz, out_xxz = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
+    
+    _, out_xyy = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
+    out_yy, out_yyy = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
+    out_yz, out_yyz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
+    
+    _, out_xzz = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
+    _, out_yzz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
+    out_zz, out_zzz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
+    
+    out_x, out_xt = jvp2(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
+                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
+    out_y, out_yt = jvp2(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
+                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
+    out_z, out_zt = jvp2(all_params, g_batch, jnp.array([[0.0, 0.0, 0.0, 1.0]]),
+                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
+    out = model_fns(all_params, g_batch)
+    uvwp = np.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+    uvwp[:,-2] = 1.185*uvwp[:,-2]
+    print(uvwp.shape)
+    uxs = np.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
+    uys = np.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uzs = np.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uxts = np.concatenate([out_xt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,0] for k in range(len(keys))],1)
+    uyts = np.concatenate([out_yt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,0] for k in range(len(keys))],1)
+    uzts = np.concatenate([out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,0] for k in range(len(keys))],1)
+    uxxs = np.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
+    uxys = np.concatenate([out_xy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uxzs = np.concatenate([out_xz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uyys = np.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uyzs = np.concatenate([out_yz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uzzs = np.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uxxxs = np.concatenate([out_xxx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
+    uxxys = np.concatenate([out_xxy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uxxzs = np.concatenate([out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uxyys = np.concatenate([out_xyy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uyyys = np.concatenate([out_yyy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
+    uyyzs = np.concatenate([out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uxzzs = np.concatenate([out_xzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uyzzs = np.concatenate([out_yzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+    uzzzs = np.concatenate([out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,3]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
+
+
+    Ty = uyts[:,2:3]-uzts[:,1:2] + uvwp[:,0:1]*(uxys[:,2:3] - uxzs[:,1:2]) + uvwp[:,1:2]*(uyys[:,2:3] - uyzs[:,1:2]) + uvwp[:,2:3]*(uyzs[:,2:3] - uzzs[:,1:2]) \
+         - (uys[:,2:3] - uzs[:,1:2])*uxs[:,0:1] - (uzs[:,0:1] - uxs[:,2:3])*uys[:,0:1] - (uxs[:,1:2] - uys[:,0:1])*uzs[:,0:1] \
+         - all_params["data"]["viscosity"]*(uxxys[:,2:3] + uyyys[:,2:3] + uyzzs[:,2:3] - uxxzs[:,1:2] - uyyzs[:,1:2] - uzzzs[:,1:2])
+    
+    Tx = (uys[:,2:3] - uzs[:,1:2])*uxs[:,1:2] + (uzs[:,0:1] - uxs[:,2:3])*uys[:,1:2] + (uxs[:,1:2] - uys[:,0:1])*uzs[:,1:2] \
+         + all_params["data"]["viscosity"]*(uxxzs[:,0:1] + uyyzs[:,0:1] + uzzzs[:,0:1] - uxxxs[:,2:3] - uxyys[:,2:3] - uxzzs[:,2:3]) \
+         - uzts[:,0:1] + uxts[:,2:3] - uvwp[:,0:1]*(uxzs[:,0:1] - uxxs[:,2:3]) - uvwp[:,1:2]*(uyzs[:,0:1] - uxys[:,2:3]) - uvwp[:,2:3]*(uzzs[:,0:1] - uxzs[:,2:3])
+    return uvwp, uxs[:,4:5], uys[:,4:5], Tx, Ty
+
 def Derivatives(dynamic_params, all_params, g_batch, model_fns):
     keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
 
@@ -193,7 +284,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
         mean_data = np.load(path + 'mean')
 
     # Evaluate the derivatives
-    uvwp, Txo, Tyo, Tx, Ty = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
+    uvwp, Txo, Tyo, Tx, Ty = zip(*[Derivatives2(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
                                         for i in range(0, eval_grid.shape[0], 10000)])
     
     # Concatenate the results
@@ -281,10 +372,10 @@ if __name__ == "__main__":
     run = PINN(c)
 
     # Get model parameters
-    checkpoint_list = sorted(glob(run.c.model_out_dir+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
+    #checkpoint_list = sorted(glob(run.c.model_out_dir+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
 
-    with open(checkpoint_list[-1],"rb") as f:
-        model_params = pickle.load(f)
+    #with open(checkpoint_list[-1],"rb") as f:
+    #    model_params = pickle.load(f)
     #with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel/save_dict_270000.pkl','rb') as f:
     #    model_params = pickle.load(f)
     all_params, model_fn, train_data, valid_data, time_n = run.test()
