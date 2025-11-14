@@ -16,7 +16,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import scipy.stats as st
 from soap_jax import soap
-
+from scipy.spatial import KDTree
 class Model(struct.PyTreeNode):
     params: Any
     forward: callable = struct.field(pytree_node=False)
@@ -90,7 +90,24 @@ class PINN(PINNbase):
         static_params = tuple(x if isinstance(x,(np.ndarray, jnp.ndarray)) else None for x in leaves)
         static_leaves = tuple(None if isinstance(x,(np.ndarray, jnp.ndarray)) else x for x in leaves)
         static_keys = (static_leaves, treedef)
-
+        """
+        # For RAD
+        time_n = np.unique(train_data['pos'][:,0])
+        new_collocs = []
+        for i in range(time_n.shape[0]):
+            file_idx = np.where(train_data['pos'][:,0]==time_n[i])[0]
+            file_tmp = train_data['pos'][file_idx,1:]
+            print(file_tmp.shape)
+            tree = KDTree(file_tmp)
+            a = np.array(list(tree.query_pairs(0.0081*1.3)))
+            #print(a)
+            new_colloc = (train_data['pos'][file_idx,:][a[:,0],:] - train_data['pos'][file_idx,:][a[:,1],:])/2 + train_data['pos'][file_idx,:][a[:,1],:]
+            print(new_colloc.shape)
+            new_collocs.append(new_colloc)
+        equation_data = np.concatenate(new_collocs,axis=0)
+        print(equation_data.shape)
+        print(equation_data)
+        """
         # Initializing batches
         p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
         v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
@@ -112,12 +129,7 @@ class PINN(PINNbase):
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                 for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
-        print(b_batches[0])
-        print(b_batches[1])
-        print(b_batches[2])
-        print(b_batches[3])
-        print(b_batches[4])
-        print(b_batches[5])
+
         if 'path_w' in all_params['data'].keys():
             w_batch = random.choice(keys_next[0],wall_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
             wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
@@ -151,7 +163,7 @@ class PINN(PINNbase):
                 lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
             
             
-                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batches, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
                 self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
         else:
             # Training loop
@@ -173,7 +185,7 @@ class PINN(PINNbase):
                 lossval, model_states, dynamic_params = update(model_states, dynamic_params, static_params, g_batch, p_batch, v_batch, b_batches)
             
             
-                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batch, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
+                self.report(i, report_fn, dynamic_params, all_params, p_batch, v_batch, g_batch, b_batches, valid_data, keys_iter[-1], self.c.optimization_init_kwargs["save_step"], model_fn)
                 self.save_model(i, dynamic_params, all_params, self.c.optimization_init_kwargs["save_step"], model_fn)
 
     def save_model(self, i, dynamic_params, all_params, save_step, model_fns):
