@@ -93,46 +93,47 @@ def Derivatives2(dynamic_params, all_params, g_batch, model_fns):
     keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
 
     all_params["network"]["layers"] = dynamic_params
-    out_xx, out_xxx = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
-    out_xy, out_xxy = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
-    out_xz, out_xxz = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                     jnp.array([[0.0, 1.0, 0.0, 0.0]]), model_fns)
+    out_xx, out_xxx = jvp3(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                     jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                     jnp.array([0.0, 1.0, 0.0, 0.0]), model_fns)
+    out_xy, out_xxy = jvp3(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                     jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                     jnp.array([0.0, 1.0, 0.0, 0.0]), model_fns)
+    out_xz, out_xxz = jvp3(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                     jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                     jnp.array([0.0, 1.0, 0.0, 0.0]), model_fns)
     
-    _, out_xyy = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
-    out_yy, out_yyy = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
-    out_yz, out_yyz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                     jnp.array([[0.0, 0.0, 1.0, 0.0]]), model_fns)
+    _, out_xyy = jvp3(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                jnp.array([0.0, 0.0, 1.0, 0.0]), model_fns)
+    out_yy, out_yyy = jvp3(all_params, g_batch, jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                     jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                     jnp.array([0.0, 0.0, 1.0, 0.0]), model_fns)
+    out_yz, out_yyz = jvp3(all_params, g_batch, jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                     jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                     jnp.array([0.0, 0.0, 1.0, 0.0]), model_fns)
     
-    _, out_xzz = jvp3(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
-    _, out_yzz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
-    out_zz, out_zzz = jvp3(all_params, g_batch, jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                     jnp.array([[0.0, 0.0, 0.0, 1.0]]), model_fns)
+    _, out_xzz = jvp3(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                jnp.array([0.0, 0.0, 0.0, 1.0]), model_fns)
+    _, out_yzz = jvp3(all_params, g_batch, jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                jnp.array([0.0, 0.0, 0.0, 1.0]), model_fns)
+    out_zz, out_zzz = jvp3(all_params, g_batch, jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                     jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                     jnp.array([0.0, 0.0, 0.0, 1.0]), model_fns)
     
-    out_x, out_xt = jvp2(all_params, g_batch, jnp.array([[0.0, 1.0, 0.0, 0.0]]),
-                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
-    out_y, out_yt = jvp2(all_params, g_batch, jnp.array([[0.0, 0.0, 1.0, 0.0]]),
-                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
-    out_z, out_zt = jvp2(all_params, g_batch, jnp.array([[0.0, 0.0, 0.0, 1.0]]),
-                                                   jnp.array([[1.0, 0.0, 0.0, 0.0]]),model_fns)
+    out_x, out_xt = jvp2(all_params, g_batch, jnp.array([0.0, 1.0, 0.0, 0.0]),
+                                                   jnp.array([1.0, 0.0, 0.0, 0.0]),model_fns)
+    out_y, out_yt = jvp2(all_params, g_batch, jnp.array([0.0, 0.0, 1.0, 0.0]),
+                                                   jnp.array([1.0, 0.0, 0.0, 0.0]),model_fns)
+    out_z, out_zt = jvp2(all_params, g_batch, jnp.array([0.0, 0.0, 0.0, 1.0]),
+                                                   jnp.array([1.0, 0.0, 0.0, 0.0]),model_fns)
     out = model_fns(all_params, g_batch)
     uvwp = np.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
     uvwp[:,-2] = 1.185*uvwp[:,-2]
     print(uvwp.shape)
+    print(out_x.shape)
     uxs = np.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
     uys = np.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
     uzs = np.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
@@ -376,8 +377,8 @@ if __name__ == "__main__":
 
     #with open(checkpoint_list[-1],"rb") as f:
     #    model_params = pickle.load(f)
-    #with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel/save_dict_270000.pkl','rb') as f:
-    #    model_params = pickle.load(f)
+    with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel/save_dict_270000.pkl','rb') as f:
+        model_params = pickle.load(f)
     all_params, model_fn, train_data, valid_data, time_n = run.test()
     model = Model(all_params["network"]["layers"], model_fn)
     all_params["network"]["layers"] = from_state_dict(model, model_params).params
