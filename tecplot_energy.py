@@ -46,9 +46,9 @@ class PINN(PINNbase):
         train_data, all_params = self.c.data.train_data(all_params)
         time_n = np.unique(train_data['pos'][:,0])
         #all_params = self.c.problem.constraints(all_params)
-        #valid_data = self.c.problem.exact_solution(all_params)
+        valid_data = self.c.problem.exact_solution(all_params)
         model_fn = c.network.network_fn
-        return all_params, model_fn, train_data, time_n
+        return all_params, model_fn, train_data, valid_data, time_n
     
 def equ_func1(all_params, g_batch, cotangent, model_fns):
     def u_t(batch):
@@ -150,15 +150,17 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
          - uzts[:,0:1] + uxts[:,2:3] - uvwp[:,0:1]*(uxzs[:,0:1] - uxxs[:,2:3]) - uvwp[:,1:2]*(uyzs[:,0:1] - uxys[:,2:3]) - uvwp[:,2:3]*(uzzs[:,0:1] - uxzs[:,2:3])
     return uvwp, uxs[:,4:5], uys[:,4:5], Tx, Ty
 
-def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn):
+def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, x_n, y_n, z_n, time_n, model_fn):
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
     dynamic_params = all_params["network"].pop("layers")
 
     # Create the evaluation grid
-    gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
-    gridbase_n = [gridbase[i].copy()/pos_ref[i] for i in range(len(gridbase))]
+    #gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
+    #gridbase_n = [gridbase[i].copy()/pos_ref[i] for i in range(len(gridbase))]
+    gridbase_n = [time_n, x_n, y_n, z_n]
+    gridbase = [gridbase_n[i].copy()*pos_ref[i] for i in range(len(gridbase_n))]
     if order[0] == 0:
         if order[1] == 1:
             z_e, y_e, x_e = np.meshgrid(gridbase[-1], gridbase[-2], gridbase[-3], indexing='ij')
@@ -283,7 +285,9 @@ if __name__ == "__main__":
 
     with open(checkpoint_list[-1],"rb") as f:
         model_params = pickle.load(f)
-    all_params, model_fn, train_data, time_n = run.test()
+    #with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel/save_dict_270000.pkl','rb') as f:
+    #    model_params = pickle.load(f)
+    all_params, model_fn, train_data, valid_data, time_n = run.test()
     model = Model(all_params["network"]["layers"], model_fn)
     all_params["network"]["layers"] = from_state_dict(model, model_params).params
     domain_range = data['tecplot_init_kwargs']['domain_range']
@@ -295,5 +299,15 @@ if __name__ == "__main__":
     is_mean = data['tecplot_init_kwargs']['is_mean']
     path = os.path.dirname(cur_dir) + '/' + path
     pos_ref = all_params["domain"]["in_max"].flatten()
+    x_n = np.unique(valid_data['pos'][:,1])
+    y_n = np.unique(valid_data['pos'][:,2])
+    z_n = np.unique(valid_data['pos'][:,3])
+    #if os.path.isdir(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel'):
+    #    pass
+    #else:
+    #    os.mkdir(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel')
+    #with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/numpymodel/save_dict_270000.pkl','wb') as f:
+    #    pickle.dump(model_params_numpy,f)
+
     for timestep in timesteps:
-        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, time_n, model_fn)
+        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, x_n, y_n, z_n, time_n, model_fn)
