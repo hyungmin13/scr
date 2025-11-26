@@ -47,7 +47,7 @@ class Data(Database):
     @staticmethod
     def data_load_wall(filename, data_keys):
         data = np.load(filename)
-        cols = {'pos':4, 'T_z':1, 'T':1}
+        cols = {'pos1':4, 'T_z':1, 'pos2':4, 'T':1}
         all_data = {}
         idx = 0
         for col in cols.keys():
@@ -63,7 +63,6 @@ class Data(Database):
                          (all_data_['pos'][:,3]>=domain_range['z'][0])&(all_data_['pos'][:,3]<=domain_range['z'][1]))
         all_data_ = {data_keys[i]:all_data_[data_keys[i]][index[0],:] for i in range(len(data_keys))}
         return all_data_
-    
     @staticmethod
     def input_normalize(all_params, data):
         domain_range = all_params["domain"]["domain_range"]
@@ -117,10 +116,12 @@ class Data(Database):
             all_data_ = Data.data_load_wall(filename, data_keys)
             for i in range(len(data_keys)): datas[data_keys[i]].append(all_data_[data_keys[i]])
         for j in range(len(data_keys)): datas[data_keys[j]] = np.concatenate(datas[data_keys[j]], 0, dtype=np.float64)
-        datas = Data.domain_filter(datas, data_keys, domain_range)
-        arg_keys = ['t', 'x', 'y']
-        for i in range(datas['pos'].shape[1]-1):
-            datas['pos'][:,i] = datas['pos'][:,i]/domain_range[arg_keys[i]][1]
+        #datas = Data.domain_filter(datas, data_keys, domain_range)
+        arg_keys = ['t', 'x', 'y', 'z']
+        for i in range(datas['pos1'].shape[1]):
+            datas['pos1'][:,i] = datas['pos1'][:,i]/domain_range[arg_keys[i]][1]
+        for i in range(datas['pos2'].shape[1]):
+            datas['pos2'][:,i] = datas['pos2'][:,i]/domain_range[arg_keys[i]][1]
         return datas
         
 if __name__ == "__main__":
@@ -129,10 +130,10 @@ if __name__ == "__main__":
 
     cur_dir = os.getcwd()
     #path = '/RBC_G8_DNS/npdata/lv6_xbound/'
-    path = '/Cooling/npdata/lv6/'
-    path_w = '/Cooling/npdata/wall_data/'
+    path = '/Cooling/npdata/lv6_50/'
+    path_w = '/Cooling/npdata/wall_data_50_025/'
     data_keys = ['pos', 'vel',]
-    wall_keys = ['pos', 'T', 'T_z']
+    wall_keys = ['pos1', 'T_z', 'pos2', 'T']
     viscosity = 15*10**(-6)
     domain_range = {'t':(0,7.4), 'x':(0,8), 'y':(0,3), 'z':(0,0.5)}
     grid_size = [51, 200, 200, 200]
@@ -156,3 +157,4 @@ if __name__ == "__main__":
     
     train_data, all_params = Data.train_data(all_params)
     wall_data = Data.wall_data(all_params.copy())
+

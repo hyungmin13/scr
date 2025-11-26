@@ -2591,3 +2591,734 @@ class Energy_vor_bd(Equation):
                                 loss_u_yl + loss_v_yu + loss_v_yl + loss_w_yu + loss_w_yl) + \
                     weights[11]*(loss_Tx_xu + loss_Tx_xl + loss_Ty_yu + loss_Ty_yl)
         return total_loss, loss_u, loss_v, loss_w, loss_con, loss_NS1, loss_NS2, loss_NS3, loss_ENR, loss_T_zu, loss_T_zb
+    
+
+class Wall_STB_1(Equation):
+    def __init__(self, all_params):
+        self.all_params = all_params
+    
+    @staticmethod
+    def Loss(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[1].shape[0],1)),model_fns)
+        b_out3 = model_fns(all_params, boundaries[3])
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out3[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out2_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss
+    @staticmethod
+    def Loss_report(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[1].shape[0],1)),model_fns)
+        b_out3 = model_fns(all_params, boundaries[3])
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out3[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out2_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss, loss_u, loss_v, loss_w, loss_con, loss_NS1, loss_NS2, loss_NS3, loss_ENR_z, loss_T_b_1, loss_T_b_z
+    
+class Wall_STB_2(Equation):
+    def __init__(self, all_params):
+        self.all_params = all_params
+    
+    @staticmethod
+    def Loss(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[1].shape[0],1)),model_fns)
+        b_out3 = model_fns(all_params, boundaries[3])
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out2_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss
+    @staticmethod
+    def Loss_report(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[1].shape[0],1)),model_fns)
+        b_out3 = model_fns(all_params, boundaries[3])
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out2_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss, loss_u, loss_v, loss_w, loss_con, loss_NS1, loss_NS2, loss_NS3, loss_ENR_z, loss_T_b_1, loss_T_b_z
+    
+class Wall_STB_3(Equation):
+    def __init__(self, all_params):
+        self.all_params = all_params
+    
+    @staticmethod
+    def Loss(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[1].shape[0],1)),model_fns)
+        b_out3, b_out3_z = equ_func1(all_params, boundaries[3], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[3].shape[0],1)),model_fns)
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out3[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out3_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss
+    @staticmethod
+    def Loss_report(dynamic_params, all_params, g_batch, particles, particle_vel, boundaries, model_fns):
+        def equ_func1(all_params, g_batch, cotangent, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            out, out_t = jax.jvp(u_t, (g_batch,), (cotangent,))
+            return out, out_t
+
+        def equ_func2(all_params, g_batch, cotangent1, cotangent2, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            out_x, out_xx = jax.jvp(u_tt, (g_batch,), (cotangent2,))
+            return out_x, out_xx
+
+        def equ_func3(all_params, g_batch, cotangent1, cotangent2, cotangent3, model_fns):
+            def u_t(batch):
+                return model_fns(all_params, batch)
+            def u_tt(batch):
+                return jax.jvp(u_t,(batch,), (cotangent1, ))[1]
+            def u_ttt(batch):
+                return jax.jvp(u_tt,(batch,), (cotangent2, ))[1]
+            out_xx, out_xxx = jax.jvp(u_ttt, (g_batch,), (cotangent3,))
+            return out_xx, out_xxx
+        keys = ['u_ref', 'v_ref', 'w_ref', 'p_ref', 'T_ref']
+        all_params["network"]["layers"] = dynamic_params
+        weights = all_params["problem"]["loss_weights"]
+ 
+        out_x, out_xx = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_y, out_yy = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+        out_z, out_zz = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),
+                                                    jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
+        out, out_t = equ_func1(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+
+
+        uvwp = jnp.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
+
+        uts = jnp.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        uxs = jnp.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uys = jnp.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzs = jnp.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        uxxs = jnp.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        uyys = jnp.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        uzzs = jnp.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        p_out = model_fns(all_params, particles)
+
+
+
+        _, b_out_xxz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_yyz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        _, b_out_zzz = equ_func3(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                        jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)), model_fns)
+        b_out_z, b_out_zt = equ_func2(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),
+                                                    jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        b_out, b_out_x = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        _, b_out_y = equ_func1(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        
+
+        b_out2, b_out2_z = equ_func1(all_params, boundaries[1], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[2].shape[0],1)),model_fns)
+        b_out3, b_out3_z = equ_func1(all_params, boundaries[3], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[3].shape[0],1)),model_fns)
+        buxs = jnp.concatenate([b_out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buys = jnp.concatenate([b_out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzs = jnp.concatenate([b_out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+
+        buzts = jnp.concatenate([b_out_zt[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['t'][1] for k in range(len(keys))],1)
+        buxxzs = jnp.concatenate([b_out_xxz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['x'][1]/all_params["domain"]["domain_range"]['x'][1] for k in range(len(keys))],1)
+        buyyzs = jnp.concatenate([b_out_yyz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['y'][1]/all_params["domain"]["domain_range"]['y'][1] for k in range(len(keys))],1)
+        buzzzs = jnp.concatenate([b_out_zzz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1]/all_params["domain"]["domain_range"]['z'][1] for k in range(len(keys))],1)
+        
+        loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
+        loss_u = jnp.mean(loss_u**2)
+
+        loss_v = all_params["data"]['v_ref']*p_out[:,1:2] - particle_vel[:,1:2]
+        loss_v = jnp.mean(loss_v**2)
+
+        loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
+        loss_w = jnp.mean(loss_w**2)
+
+        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = jnp.mean(loss_u_b**2)
+
+        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = jnp.mean(loss_v_b**2)
+
+        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = jnp.mean(loss_w_b**2)
+
+        loss_T_b_1 = all_params["data"]['T_ref']*b_out3[:,4:5] - boundaries[4]
+        loss_T_b_1 = jnp.mean(loss_T_b_1**2)
+
+        loss_T_b_z = all_params["data"]['T_ref']*b_out3_z[:,4:5]/all_params["domain"]["domain_range"]['z'][1] - boundaries[2]
+        loss_T_b_z = jnp.mean(loss_T_b_z**2)
+
+        loss_con = uxs[:,0:1] + uys[:,1:2] + uzs[:,2:3]
+        loss_con = jnp.mean(loss_con**2)
+        loss_NS1 = uts[:,0:1] + uvwp[:,0:1]*uxs[:,0:1] + uvwp[:,1:2]*uys[:,0:1] + uvwp[:,2:3]*uzs[:,0:1] + uxs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,0:1]+uyys[:,0:1]+uzzs[:,0:1])
+        loss_NS1 = jnp.mean(loss_NS1**2)
+        loss_NS2 = uts[:,1:2] + uvwp[:,0:1]*uxs[:,1:2] + uvwp[:,1:2]*uys[:,1:2] + uvwp[:,2:3]*uzs[:,1:2] + uys[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,1:2]+uyys[:,1:2]+uzzs[:,1:2])
+        loss_NS2 = jnp.mean(loss_NS2**2)
+        loss_NS3 = uts[:,2:3] + uvwp[:,0:1]*uxs[:,2:3] + uvwp[:,1:2]*uys[:,2:3] + uvwp[:,2:3]*uzs[:,2:3] + uzs[:,3:4] - all_params["data"]["viscosity"]*(uxxs[:,2:3]+uyys[:,2:3]+uzzs[:,2:3]) - uvwp[:,4:5]
+        loss_NS3 = jnp.mean(loss_NS3**2)
+        loss_ENR_z = buzts[:,4:5] + buzs[:,0:1]*buxs[:,4:5] + buzs[:,1:2]*buys[:,4:5] + buzs[:,2:3]*buzs[:,4:5] - all_params["data"]["viscosity"]*(buxxzs[:,4:5]+buyyzs[:,4:5]+buzzzs[:,4:5])/0.25
+        loss_ENR_z = jnp.mean(loss_ENR_z**2)
+
+        total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
+                    weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
+                    weights[6]*loss_NS3 + weights[7]*loss_ENR_z + weights[8]*(loss_u_b + loss_v_b + loss_w_b) + \
+                    weights[9]*loss_T_b_1 + weights[10]*loss_T_b_z
+        return total_loss, loss_u, loss_v, loss_w, loss_con, loss_NS1, loss_NS2, loss_NS3, loss_ENR_z, loss_T_b_1, loss_T_b_z
+    
