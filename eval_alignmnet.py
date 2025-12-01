@@ -292,7 +292,17 @@ def total_loss(dynamic_params, all_params, g_batch, particles, particle_vel, mod
                     weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
                     weights[6]*loss_NS3 
         return total_loss
-
+@partial(jax.jit, static_argnums=())
+def all_losses(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn):
+    _, u_loss_grad = value_and_grad(u_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+    _, v_loss_grad = value_and_grad(v_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+    _, w_loss_grad = value_and_grad(w_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+    _, con_grad = value_and_grad(con,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+    _, NS1_grad = value_and_grad(NS1,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+    _, NS2_grad = value_and_grad(NS2,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+    _, NS3_grad = value_and_grad(NS3,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+    _, total_grad = value_and_grad(total_loss,argnums=0)(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn)
+    return u_loss_grad, v_loss_grad, w_loss_grad, con_grad, NS1_grad, NS2_grad, NS3_grad, total_grad
 #%%
 if __name__ == "__main__":
     from domain import *
@@ -361,6 +371,12 @@ if __name__ == "__main__":
     intra_list = []
     inter_list = []
     total_grad_list = []
+    with open(checkpoint_list[0],"rb") as f:
+        model_params = pickle.load(f)
+    model = Model(all_params["network"]["layers"], model_fn)
+    all_params["network"]["layers"] = from_state_dict(model, model_params).params
+    dynamic_params = all_params["network"].pop("layers")
+    update = all_losses.lower(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn).compile()
     for i in tqdm(range(c.optimization_init_kwargs["n_steps"])):
         keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
         p_batch = random.choice(keys_next[0],train_data['pos'],shape=(c.optimization_init_kwargs["p_batch"],))
@@ -383,14 +399,15 @@ if __name__ == "__main__":
             model = Model(all_params["network"]["layers"], model_fn)
             all_params["network"]["layers"] = from_state_dict(model, model_params).params
             dynamic_params = all_params["network"].pop("layers")
-            _, u_loss_grad = value_and_grad(u_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
-            _, v_loss_grad = value_and_grad(v_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
-            _, w_loss_grad = value_and_grad(w_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
-            _, con_grad = value_and_grad(con,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
-            _, NS1_grad = value_and_grad(NS1,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
-            _, NS2_grad = value_and_grad(NS2,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
-            _, NS3_grad = value_and_grad(NS3,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
-            _, total_grad = value_and_grad(total_loss,argnums=0)(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn)
+            #_, u_loss_grad = value_and_grad(u_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+            #_, v_loss_grad = value_and_grad(v_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+            #_, w_loss_grad = value_and_grad(w_loss,argnums=0)(dynamic_params, all_params, p_batch, v_batch, model_fn)
+            #_, con_grad = value_and_grad(con,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+            #_, NS1_grad = value_and_grad(NS1,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+            #_, NS2_grad = value_and_grad(NS2,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+            #_, NS3_grad = value_and_grad(NS3,argnums=0)(dynamic_params, all_params, g_batch, model_fn)
+            #_, total_grad = value_and_grad(total_loss,argnums=0)(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn)
+            u_loss_grad, v_loss_grad, w_loss_grad, con_grad, NS1_grad, NS2_grad, NS3_grad, total_grad = update(dynamic_params, all_params, g_batch, p_batch, v_batch, model_fn)
             #print(len(u_loss_grad[0]))
             
             #print(u_loss_grad[1][0].shape)
