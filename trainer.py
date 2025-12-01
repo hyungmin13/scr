@@ -70,7 +70,7 @@ class PINN(PINNbase):
         if 'path_w' in all_params['data'].keys():
             print('wall data detected')
             wall_data = self.c.data.wall_data(all_params.copy())
-            delta_z = np.unique(wall_data['pos2'][:,3])
+            #delta_z = np.unique(wall_data['pos2'][:,3])
         valid_data = self.c.problem.exact_solution(all_params.copy())
         #model_states = optimiser.init(all_params["network"]["layers"])
         #optimiser_fn = optimiser.update
@@ -123,14 +123,13 @@ class PINN(PINNbase):
                                            grids['eqns'][arg], 
                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                              for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+
         b_batches = []
         for b_key in all_params["domain"]["bound_keys"]:
             b_batch = jnp.stack([random.choice(keys_next[k+5], 
                                             grids[b_key][arg], 
-                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) if k!=3 else random.choice(keys_next[k+5], 
-                                            grids[b_key][arg], 
-                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) + delta_z
-                                for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
+                                            for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
 
         if 'path_w' in all_params['data'].keys():
@@ -230,6 +229,7 @@ class PINN(PINNbase):
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
                     f.write(f"{i:<{12}} {Losses[0]:<{12}.{5}} {Losses[1]:<{12}.{5}} {Losses[2]:<{12}.{5}} {Losses[3]:<{12}.{5}} {Losses[4]:<{12}.{5}} {Losses[5]:<{12}.{5}} {Losses[6]:<{12}.{5}} {Losses[7]:<{12}.{5}} {Losses[8]:<{12}.{5}} {u_error:<{12}.{5}} {v_error:<{12}.{5}} {w_error:<{12}.{5}}\n")
+            
             else:
                 print(f"step_num : {i:<{12}} u_loss : {Losses[1]:<{12}.{5}} v_loss : {Losses[2]:<{12}.{5}} w_loss : {Losses[3]:<{12}.{5}} u_error : {u_error:<{12}.{5}} v_error : {v_error:<{12}.{5}} w_error : {w_error:<{12}.{5}}")
                 with open(self.c.report_out_dir + "reports.txt", "a") as f:
