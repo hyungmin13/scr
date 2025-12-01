@@ -743,51 +743,64 @@ class Boundary_layer_energy(Equation):
         out_z, out_zz = second_order(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
 
         p_out = model_fns(all_params, particles)                                                                           
-        b_out = model_fns(all_params, boundaries[0])
         b_out2 = model_fns(all_params, boundaries[1])
         u = all_params["data"]['u_ref']*out[:,0:1]
         v = all_params["data"]['v_ref']*out[:,1:2]
         w = all_params["data"]['w_ref']*out[:,2:3]
-        p = all_params["data"]['p_ref']*out[:,3:4]
-        T = all_params["data"]['T_ref']*out[:,4:5]
+
 
         ut = all_params["data"]['u_ref']*out_t[:,0:1]/all_params["domain"]["domain_range"]["t"][1]
         vt = all_params["data"]['v_ref']*out_t[:,1:2]/all_params["domain"]["domain_range"]["t"][1]
         wt = all_params["data"]['w_ref']*out_t[:,2:3]/all_params["domain"]["domain_range"]["t"][1]
-        Tt = all_params["data"]['T_ref']*out_t[:,4:5]/all_params["domain"]["domain_range"]["t"][1]
+
 
         ux = all_params["data"]['u_ref']*out_x[:,0:1]/all_params["domain"]["domain_range"]["x"][1]
         vx = all_params["data"]['v_ref']*out_x[:,1:2]/all_params["domain"]["domain_range"]["x"][1]
         wx = all_params["data"]['w_ref']*out_x[:,2:3]/all_params["domain"]["domain_range"]["x"][1]
         px = all_params["data"]['p_ref']*out_x[:,3:4]/all_params["domain"]["domain_range"]["x"][1]
-        Tx = all_params["data"]['T_ref']*out_x[:,4:5]/all_params["domain"]["domain_range"]["x"][1]
+
 
         uy = all_params["data"]['u_ref']*out_y[:,0:1]/all_params["domain"]["domain_range"]["y"][1]
         vy = all_params["data"]['v_ref']*out_y[:,1:2]/all_params["domain"]["domain_range"]["y"][1]
         wy = all_params["data"]['w_ref']*out_y[:,2:3]/all_params["domain"]["domain_range"]["y"][1]
         py = all_params["data"]['p_ref']*out_y[:,3:4]/all_params["domain"]["domain_range"]["y"][1]
-        Ty = all_params["data"]['T_ref']*out_y[:,4:5]/all_params["domain"]["domain_range"]["y"][1]
+
 
         uz = all_params["data"]['u_ref']*out_z[:,0:1]/all_params["domain"]["domain_range"]["z"][1]
         vz = all_params["data"]['v_ref']*out_z[:,1:2]/all_params["domain"]["domain_range"]["z"][1]
         wz = all_params["data"]['w_ref']*out_z[:,2:3]/all_params["domain"]["domain_range"]["z"][1]
         pz = all_params["data"]['p_ref']*out_z[:,3:4]/all_params["domain"]["domain_range"]["z"][1]
-        Tz = all_params["data"]['T_ref']*out_z[:,4:5]/all_params["domain"]["domain_range"]["z"][1]
+
 
         uxx = all_params["data"]['u_ref']*out_xx[:,0:1]/all_params["domain"]["domain_range"]["x"][1]**2
         vxx = all_params["data"]['v_ref']*out_xx[:,1:2]/all_params["domain"]["domain_range"]["x"][1]**2
         wxx = all_params["data"]['w_ref']*out_xx[:,2:3]/all_params["domain"]["domain_range"]["x"][1]**2
-        Txx = all_params["data"]['T_ref']*out_xx[:,4:5]/all_params["domain"]["domain_range"]["x"][1]**2
+
 
         uyy = all_params["data"]['u_ref']*out_yy[:,0:1]/all_params["domain"]["domain_range"]["y"][1]**2
         vyy = all_params["data"]['v_ref']*out_yy[:,1:2]/all_params["domain"]["domain_range"]["y"][1]**2
         wyy = all_params["data"]['w_ref']*out_yy[:,2:3]/all_params["domain"]["domain_range"]["y"][1]**2
-        Tyy = all_params["data"]['T_ref']*out_yy[:,4:5]/all_params["domain"]["domain_range"]["y"][1]**2
+
 
         uzz = all_params["data"]['u_ref']*out_zz[:,0:1]/all_params["domain"]["domain_range"]["z"][1]**2
         vzz = all_params["data"]['v_ref']*out_zz[:,1:2]/all_params["domain"]["domain_range"]["z"][1]**2
         wzz = all_params["data"]['w_ref']*out_zz[:,2:3]/all_params["domain"]["domain_range"]["z"][1]**2
-        Tzz = all_params["data"]['T_ref']*out_zz[:,4:5]/all_params["domain"]["domain_range"]["z"][1]**2
+
+
+        bout, bout_t = first_order(all_params, boundaries[0], jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_x, bout_xx = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_y, bout_yy = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_z, bout_zz = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bu = all_params["data"]['u_ref']*bout[:,0:1]
+        bv = all_params["data"]['v_ref']*bout[:,1:2]
+        bw = all_params["data"]['w_ref']*bout[:,2:3]
+        bTt = all_params["data"]['T_ref']*bout_t[:,4:5]/all_params["domain"]["domain_range"]["t"][1]
+        bTx = all_params["data"]['T_ref']*bout_x[:,4:5]/all_params["domain"]["domain_range"]["x"][1]
+        bTy = all_params["data"]['T_ref']*bout_y[:,4:5]/all_params["domain"]["domain_range"]["y"][1]
+        bTz = all_params["data"]['T_ref']*bout_z[:,4:5]/all_params["domain"]["domain_range"]["z"][1]
+        bTxx = all_params["data"]['T_ref']*bout_xx[:,4:5]/all_params["domain"]["domain_range"]["x"][1]**2
+        bTyy = all_params["data"]['T_ref']*bout_yy[:,4:5]/all_params["domain"]["domain_range"]["y"][1]**2
+        bTzz = all_params["data"]['T_ref']*bout_zz[:,4:5]/all_params["domain"]["domain_range"]["z"][1]**2
 
         loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
         loss_u = jnp.mean(loss_u**2)
@@ -798,16 +811,16 @@ class Boundary_layer_energy(Equation):
         loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
         loss_w = jnp.mean(loss_w**2)
 
-        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = all_params["data"]['u_ref']*bout[:,0:1]
         loss_u_b = jnp.mean(loss_u_b**2)
 
-        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = all_params["data"]['v_ref']*bout[:,1:2]
         loss_v_b = jnp.mean(loss_v_b**2)
 
-        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = all_params["data"]['w_ref']*bout[:,2:3]
         loss_w_b = jnp.mean(loss_w_b**2)
 
-        loss_T_b = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[2]
+        loss_T_b = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[4]
         loss_T_b = jnp.mean(loss_T_b**2)
 
         loss_con = ux + vy + wz
@@ -818,7 +831,7 @@ class Boundary_layer_energy(Equation):
         loss_NS2 = jnp.mean(loss_NS2**2)
         loss_NS3 = wt + u*wx + v*wy + w*wz + pz - all_params["data"]["viscosity"]*(wxx+wyy+wzz)
         loss_NS3 = jnp.mean(loss_NS3**2)
-        loss_ENR = Tt + u*Tx + v*Ty + w*Tz - all_params["data"]["viscosity"]*(Txx+Tyy+Tzz)/0.25
+        loss_ENR = bTt + bu*bTx + bv*bTy + bw*bTz - all_params["data"]["viscosity"]*(bTxx+bTyy+bTzz)/0.25
         loss_ENR = jnp.mean(loss_ENR**2)
         total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
                     weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
@@ -847,52 +860,65 @@ class Boundary_layer_energy(Equation):
         out_z, out_zz = second_order(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
 
         p_out = model_fns(all_params, particles)                                                                           
-        b_out = model_fns(all_params, boundaries[0])
         b_out2 = model_fns(all_params, boundaries[1])
         u = all_params["data"]['u_ref']*out[:,0:1]
         v = all_params["data"]['v_ref']*out[:,1:2]
         w = all_params["data"]['w_ref']*out[:,2:3]
-        p = all_params["data"]['p_ref']*out[:,3:4]
-        T = all_params["data"]['T_ref']*out[:,4:5]
+
 
         ut = all_params["data"]['u_ref']*out_t[:,0:1]/all_params["domain"]["domain_range"]["t"][1]
         vt = all_params["data"]['v_ref']*out_t[:,1:2]/all_params["domain"]["domain_range"]["t"][1]
         wt = all_params["data"]['w_ref']*out_t[:,2:3]/all_params["domain"]["domain_range"]["t"][1]
-        Tt = all_params["data"]['T_ref']*out_t[:,4:5]/all_params["domain"]["domain_range"]["t"][1]
+
 
         ux = all_params["data"]['u_ref']*out_x[:,0:1]/all_params["domain"]["domain_range"]["x"][1]
         vx = all_params["data"]['v_ref']*out_x[:,1:2]/all_params["domain"]["domain_range"]["x"][1]
         wx = all_params["data"]['w_ref']*out_x[:,2:3]/all_params["domain"]["domain_range"]["x"][1]
         px = all_params["data"]['p_ref']*out_x[:,3:4]/all_params["domain"]["domain_range"]["x"][1]
-        Tx = all_params["data"]['T_ref']*out_x[:,4:5]/all_params["domain"]["domain_range"]["x"][1]
+
 
         uy = all_params["data"]['u_ref']*out_y[:,0:1]/all_params["domain"]["domain_range"]["y"][1]
         vy = all_params["data"]['v_ref']*out_y[:,1:2]/all_params["domain"]["domain_range"]["y"][1]
         wy = all_params["data"]['w_ref']*out_y[:,2:3]/all_params["domain"]["domain_range"]["y"][1]
         py = all_params["data"]['p_ref']*out_y[:,3:4]/all_params["domain"]["domain_range"]["y"][1]
-        Ty = all_params["data"]['T_ref']*out_y[:,4:5]/all_params["domain"]["domain_range"]["y"][1]
+
 
         uz = all_params["data"]['u_ref']*out_z[:,0:1]/all_params["domain"]["domain_range"]["z"][1]
         vz = all_params["data"]['v_ref']*out_z[:,1:2]/all_params["domain"]["domain_range"]["z"][1]
         wz = all_params["data"]['w_ref']*out_z[:,2:3]/all_params["domain"]["domain_range"]["z"][1]
         pz = all_params["data"]['p_ref']*out_z[:,3:4]/all_params["domain"]["domain_range"]["z"][1]
-        Tz = all_params["data"]['T_ref']*out_z[:,4:5]/all_params["domain"]["domain_range"]["z"][1]
+
 
         uxx = all_params["data"]['u_ref']*out_xx[:,0:1]/all_params["domain"]["domain_range"]["x"][1]**2
         vxx = all_params["data"]['v_ref']*out_xx[:,1:2]/all_params["domain"]["domain_range"]["x"][1]**2
         wxx = all_params["data"]['w_ref']*out_xx[:,2:3]/all_params["domain"]["domain_range"]["x"][1]**2
-        Txx = all_params["data"]['T_ref']*out_xx[:,4:5]/all_params["domain"]["domain_range"]["x"][1]**2
+
 
         uyy = all_params["data"]['u_ref']*out_yy[:,0:1]/all_params["domain"]["domain_range"]["y"][1]**2
         vyy = all_params["data"]['v_ref']*out_yy[:,1:2]/all_params["domain"]["domain_range"]["y"][1]**2
         wyy = all_params["data"]['w_ref']*out_yy[:,2:3]/all_params["domain"]["domain_range"]["y"][1]**2
-        Tyy = all_params["data"]['T_ref']*out_yy[:,4:5]/all_params["domain"]["domain_range"]["y"][1]**2
+
 
         uzz = all_params["data"]['u_ref']*out_zz[:,0:1]/all_params["domain"]["domain_range"]["z"][1]**2
         vzz = all_params["data"]['v_ref']*out_zz[:,1:2]/all_params["domain"]["domain_range"]["z"][1]**2
         wzz = all_params["data"]['w_ref']*out_zz[:,2:3]/all_params["domain"]["domain_range"]["z"][1]**2
-        Tzz = all_params["data"]['T_ref']*out_zz[:,4:5]/all_params["domain"]["domain_range"]["z"][1]**2
 
+
+        bout, bout_t = first_order(all_params, boundaries[0], jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_x, bout_xx = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_y, bout_yy = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bout_z, bout_zz = second_order(all_params, boundaries[0], jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(boundaries[0].shape[0],1)),model_fns)
+        bu = all_params["data"]['u_ref']*bout[:,0:1]
+        bv = all_params["data"]['v_ref']*bout[:,1:2]
+        bw = all_params["data"]['w_ref']*bout[:,2:3]
+        bTt = all_params["data"]['T_ref']*bout_t[:,4:5]/all_params["domain"]["domain_range"]["t"][1]
+        bTx = all_params["data"]['T_ref']*bout_x[:,4:5]/all_params["domain"]["domain_range"]["x"][1]
+        bTy = all_params["data"]['T_ref']*bout_y[:,4:5]/all_params["domain"]["domain_range"]["y"][1]
+        bTz = all_params["data"]['T_ref']*bout_z[:,4:5]/all_params["domain"]["domain_range"]["z"][1]
+        bTxx = all_params["data"]['T_ref']*bout_xx[:,4:5]/all_params["domain"]["domain_range"]["x"][1]**2
+        bTyy = all_params["data"]['T_ref']*bout_yy[:,4:5]/all_params["domain"]["domain_range"]["y"][1]**2
+        bTzz = all_params["data"]['T_ref']*bout_zz[:,4:5]/all_params["domain"]["domain_range"]["z"][1]**2
+        
         loss_u = all_params["data"]['u_ref']*p_out[:,0:1] - particle_vel[:,0:1]
         loss_u = jnp.mean(loss_u**2)
 
@@ -902,16 +928,16 @@ class Boundary_layer_energy(Equation):
         loss_w = all_params["data"]['w_ref']*p_out[:,2:3] - particle_vel[:,2:3]
         loss_w = jnp.mean(loss_w**2)
 
-        loss_u_b = all_params["data"]['u_ref']*b_out[:,0:1]
+        loss_u_b = all_params["data"]['u_ref']*bout[:,0:1]
         loss_u_b = jnp.mean(loss_u_b**2)
 
-        loss_v_b = all_params["data"]['v_ref']*b_out[:,1:2]
+        loss_v_b = all_params["data"]['v_ref']*bout[:,1:2]
         loss_v_b = jnp.mean(loss_v_b**2)
 
-        loss_w_b = all_params["data"]['w_ref']*b_out[:,2:3]
+        loss_w_b = all_params["data"]['w_ref']*bout[:,2:3]
         loss_w_b = jnp.mean(loss_w_b**2)
 
-        loss_T_b = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[2]
+        loss_T_b = all_params["data"]['T_ref']*b_out2[:,4:5] - boundaries[4]
         loss_T_b = jnp.mean(loss_T_b**2)
 
         loss_con = ux + vy + wz
@@ -922,7 +948,7 @@ class Boundary_layer_energy(Equation):
         loss_NS2 = jnp.mean(loss_NS2**2)
         loss_NS3 = wt + u*wx + v*wy + w*wz + pz - all_params["data"]["viscosity"]*(wxx+wyy+wzz)
         loss_NS3 = jnp.mean(loss_NS3**2)
-        loss_ENR = Tt + u*Tx + v*Ty + w*Tz - all_params["data"]["viscosity"]*(Txx+Tyy+Tzz)/0.25
+        loss_ENR = bTt + bu*bTx + bv*bTy + bw*bTz - all_params["data"]["viscosity"]*(bTxx+bTyy+bTzz)/0.25
         loss_ENR = jnp.mean(loss_ENR**2)
         total_loss = weights[0]*loss_u + weights[1]*loss_v + weights[2]*loss_w + \
                     weights[3]*loss_con + weights[4]*loss_NS1 + weights[5]*loss_NS2 + \
