@@ -363,21 +363,21 @@ if __name__ == "__main__":
     total_grad_list = []
     for i in tqdm(range(330000)):
         keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-        p_batch = random.choice(keys_next[0],train_data['pos'],shape=(c.optimization_init_kwargs["p_batch"],))
-        v_batch = random.choice(keys_next[0],train_data['vel'],shape=(c.optimization_init_kwargs["p_batch"],))
-        g_batch = jnp.stack([random.choice(keys_next[k+1], 
-                                        grids['eqns'][arg], 
-                                        shape=(c.optimization_init_kwargs["e_batch"],)) 
-                            for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-        b_batches = []
-        for b_key in all_params["domain"]["bound_keys"]:
-            b_batch = jnp.stack([random.choice(keys_next[k+5], 
-                                            grids[b_key][arg], 
-                                            shape=(c.optimization_init_kwargs["e_batch"],)) 
-                                for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-            b_batches.append(b_batch)
         
         if (i<100) or (300000<i<300100):
+            p_batch = random.choice(keys_next[0],train_data['pos'],shape=(c.optimization_init_kwargs["p_batch"],))
+            v_batch = random.choice(keys_next[0],train_data['vel'],shape=(c.optimization_init_kwargs["p_batch"],))
+            g_batch = jnp.stack([random.choice(keys_next[k+1], 
+                                            grids['eqns'][arg], 
+                                            shape=(c.optimization_init_kwargs["e_batch"],)) 
+                                for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+            b_batches = []
+            for b_key in all_params["domain"]["bound_keys"]:
+                b_batch = jnp.stack([random.choice(keys_next[k+5], 
+                                                grids[b_key][arg], 
+                                                shape=(c.optimization_init_kwargs["e_batch"],)) 
+                                    for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
+                b_batches.append(b_batch)
             with open(checkpoint_list[m],"rb") as f:
                 model_params = pickle.load(f)
             model = Model(all_params["network"]["layers"], model_fn)
@@ -406,6 +406,7 @@ if __name__ == "__main__":
                                              w_loss_grad/jnp.linalg.norm(w_loss_grad)+con_grad/jnp.linalg.norm(con_grad)+
                                              NS1_grad/jnp.linalg.norm(NS1_grad)+NS2_grad/jnp.linalg.norm(NS2_grad)+
                                              NS3_grad/jnp.linalg.norm(NS3_grad))/7)**2)-1
+            print('check')
             if i > 0:
                 inter_score = 2*(jnp.linalg.norm((total_grad/jnp.linalg.norm(total_grad)+total_grad_temp/jnp.linalg.norm(total_grad_temp))/2)**2)-1
                 inter_list.append(inter_score)
