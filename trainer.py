@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 from soap_jax import soap
 from scipy.spatial import KDTree
+import itertools
 class Model(struct.PyTreeNode):
     params: Any
     forward: callable = struct.field(pytree_node=False)
@@ -109,9 +110,23 @@ class PINN(PINNbase):
         """
         
         # Initializing batches
-        p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-        v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-
+        #p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        #v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        N_p = train_data['pos'].shape[0]
+        perm_p = random.permutation(keys_next[0], N_p)
+        data_p = []
+        data_v = []
+        for i in range(N_p//self.c.optimization_init_kwargs["p_batch"]):
+            batch_p = train_data['pos'][perm_p[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+            batch_v = train_data['vel'][perm_p[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+            data_p.append(batch_p)
+            data_v.append(batch_v)
+        data_p.append(train_data['pos'][perm_p[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+        data_v.append(train_data['vel'][perm_p[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+        p_batches = itertools.cycle(data_p)
+        v_batches = itertools.cycle(data_v)
+        p_batch = next(p_batches)
+        v_batch = next(v_batches)
         #grids['eqns']['t'] = np.unique(train_data['pos'][:,0])
         #grids['bcxu']['t'] = np.unique(train_data['pos'][:,0])
         #grids['bcxl']['t'] = np.unique(train_data['pos'][:,0])
@@ -132,11 +147,43 @@ class PINN(PINNbase):
                                             for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
 
+        #if 'path_w' in all_params['data'].keys():
+        #    w_batch1 = random.choice(keys_next[0],wall_data['pos1'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        #    wTz_batch = random.choice(keys_next[0],wall_data['T_z'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        #    w_batch2 = random.choice(keys_next[0],wall_data['pos2'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        #    wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+        #    b_batches.append(w_batch1)
+        #    b_batches.append(wTz_batch)
+        #    b_batches.append(w_batch2)
+        #    b_batches.append(wT_batch)
         if 'path_w' in all_params['data'].keys():
-            w_batch1 = random.choice(keys_next[0],wall_data['pos1'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            wTz_batch = random.choice(keys_next[0],wall_data['T_z'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            w_batch2 = random.choice(keys_next[0],wall_data['pos2'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-            wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+            N_w = wall_data['pos1'].shape[0]
+            perm_w = random.permutation(keys_next[0], N_w)
+            data_w1 = []
+            data_wTz = []
+            data_w2 = []
+            data_wT = []
+            for i in range(N_w//self.c.optimization_init_kwargs["p_batch"]):
+                batch_w1 = wall_data['pos1'][perm_w[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+                batch_wTz = wall_data['T_z'][perm_w[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+                batch_w2 = wall_data['pos2'][perm_w[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+                batch_wT = wall_data['T'][perm_w[i*self.c.optimization_init_kwargs["p_batch"]:(i+1)*self.c.optimization_init_kwargs["p_batch"]],:]
+                data_w1.append(batch_w1)
+                data_wTz.append(batch_wTz)
+                data_w2.append(batch_w2)
+                data_wT.append(batch_wT)
+            data_w1.append(wall_data['pos1'][perm_w[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+            data_wTz.append(wall_data['T_z'][perm_w[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+            data_w2.append(wall_data['pos2'][perm_w[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+            data_wT.append(wall_data['T'][perm_w[-1-self.c.optimization_init_kwargs["p_batch"]:-1],:])
+            w_batches1 = itertools.cycle(data_w1)
+            wTz_batches = itertools.cycle(data_wTz)
+            w_batches2 = itertools.cycle(data_w2)
+            wT_batches = itertools.cycle(data_wT)
+            w_batch1 = next(w_batches1)
+            wTz_batch = next(wTz_batches)
+            w_batch2 = next(w_batches2)
+            wT_batch = next(wT_batches)
             b_batches.append(w_batch1)
             b_batches.append(wTz_batch)
             b_batches.append(w_batch2)
@@ -147,16 +194,22 @@ class PINN(PINNbase):
             # Training loop
             for i in range(self.c.optimization_init_kwargs["n_steps"]):
                 keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-                p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-                v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                p_batch = next(p_batches)
+                v_batch = next(v_batches)
                 g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                                 grids['eqns'][arg], 
                                                 shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                     for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-                w_batch1 = random.choice(keys_next[0],wall_data['pos1'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-                wTz_batch = random.choice(keys_next[0],wall_data['T_z'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-                w_batch2 = random.choice(keys_next[0],wall_data['pos2'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-                wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))   
+                #w_batch1 = random.choice(keys_next[0],wall_data['pos1'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #wTz_batch = random.choice(keys_next[0],wall_data['T_z'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #w_batch2 = random.choice(keys_next[0],wall_data['pos2'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #wT_batch = random.choice(keys_next[0],wall_data['T'],shape=(self.c.optimization_init_kwargs["p_batch"],))   
+                w_batch1 = next(w_batches1)
+                wTz_batch = next(wTz_batches)
+                w_batch2 = next(w_batches2)
+                wT_batch = next(wT_batches)
                 b_batches = []
                 for b_key in all_params["domain"]["bound_keys"]:
                     b_batch = jnp.stack([random.choice(keys_next[k+5], 
@@ -178,8 +231,10 @@ class PINN(PINNbase):
             # Training loop
             for i in range(self.c.optimization_init_kwargs["n_steps"]):
                 keys_next = [next(keys_iter[i]) for i in range(num_keysplit)]
-                p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
-                v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                p_batch = next(p_batches)
+                v_batch = next(v_batches)
+                #p_batch = random.choice(keys_next[0],train_data['pos'],shape=(self.c.optimization_init_kwargs["p_batch"],))
+                #v_batch = random.choice(keys_next[0],train_data['vel'],shape=(self.c.optimization_init_kwargs["p_batch"],))
                 g_batch = jnp.stack([random.choice(keys_next[k+1], 
                                                 grids['eqns'][arg], 
                                                 shape=(self.c.optimization_init_kwargs["e_batch"],)) 
