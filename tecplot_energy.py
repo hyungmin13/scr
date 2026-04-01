@@ -132,8 +132,7 @@ def Derivatives2(dynamic_params, all_params, g_batch, model_fns):
     out = model_fns(all_params, g_batch)
     uvwp = np.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
     uvwp[:,-2] = 1.185*uvwp[:,-2]
-    print(uvwp.shape)
-    print(out_x.shape)
+
     uxs = np.concatenate([out_x[:,0,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
     uys = np.concatenate([out_y[:,0,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
     uzs = np.concatenate([out_z[:,0,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)

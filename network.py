@@ -33,7 +33,7 @@ class MLP(Network):
 
     @staticmethod
     def network_fn(all_params, x):
-        params = all_params["network"]["layers"]
+        params = all_params["network1"]["layers"]
         inmin = all_params["domain"]["in_min"]
         inmax = all_params["domain"]["in_max"]
         x = 2*(x - inmin)/(inmax-inmin) - 1
@@ -45,7 +45,7 @@ class MLP(Network):
         return x
 
     def network_fn3(self, x):
-        params = self.all_params["network"]["layers"]
+        params = self.all_params["network2"]["layers"]
         inmin = self.all_params["domain"]["in_min"]
         inmax = self.all_params["domain"]["in_max"]
         x = 2*(x - inmin)/(inmax-inmin) - 1
