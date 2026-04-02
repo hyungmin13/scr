@@ -220,7 +220,7 @@ if __name__ == "__main__":
                     network1_init_kwargs = values[3],
                     problem_init_kwargs = values[4],
                     optimization_init_kwargs = values[5],
-                    equation_init_kwargs = values[6],)
+                    equation1_init_kwargs = values[6],)
     except:
         c = Constants(run = values[0],
                     domain_init_kwargs = values[1],
