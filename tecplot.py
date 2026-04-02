@@ -54,6 +54,24 @@ class PINN(PINNbase):
         except:
             model_fn = c.network.network_fn
         return all_params, model_fn, train_data
+
+class PINN2(PINNbase):
+    def test(self):
+        all_params = {"domain":{}, "data":{}, "network1":{}, "network2":{}, "problem":{}}
+        all_params["domain"] = self.c.domain.init_params(**self.c.domain_init_kwargs)
+        all_params["data"] = self.c.data.init_params(**self.c.data_init_kwargs)
+        global_key = random.PRNGKey(42)
+        all_params["network1"] = self.c.network1.init_params(**self.c.network1_init_kwargs)
+        all_params["network2"] = self.c.network2.init_params(**self.c.network2_init_kwargs)
+        all_params["problem"] = self.c.problem.init_params(**self.c.problem_init_kwargs)
+        optimiser = self.c.optimization_init_kwargs["optimiser"](self.c.optimization_init_kwargs["learning_rate"])
+        grids, all_params = self.c.domain.sampler(all_params)
+        train_data, all_params = self.c.data.train_data(all_params)
+        #all_params = self.c.problem.constraints(all_params)
+        #valid_data = self.c.problem.exact_solution(all_params)
+        model_fn = c.network1.network_fn
+        model_fn2 = c.network2.network_fn2
+        return all_params, model_fn, model_fn2, train_data
     
 def equ_func(all_params, g_batch, cotangent, model_fns):
     def u_t(batch):
@@ -213,36 +231,63 @@ if __name__ == "__main__":
     with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/summary/constants.pickle','rb') as f:
         constants = pickle.load(f)
     values = list(constants.values())
-    try:
+    print(values)
+    if values[4]:
         c = Constants(run = values[0],
                     domain_init_kwargs = values[1],
                     data_init_kwargs = values[2],
                     network1_init_kwargs = values[3],
-                    problem_init_kwargs = values[4],
-                    optimization_init_kwargs = values[5],
-                    equation_init_kwargs = values[6],)
-    except:
-        c = Constants(run = values[0],
-                    domain_init_kwargs = values[1],
-                    data_init_kwargs = values[2],
-                    network_init_kwargs = values[3],
-                    problem_init_kwargs = values[4],
-                    optimization_init_kwargs = values[5],
-                    equation_init_kwargs = values[6],)
-    run = PINN(c)
+                    network2_init_kwargs = values[4],
+                    problem_init_kwargs = values[5],
+                    optimization_init_kwargs = values[6],
+                    equation_init_kwargs = values[7],)
+    else:
+        try:
+            c = Constants(run = values[0],
+                        domain_init_kwargs = values[1],
+                        data_init_kwargs = values[2],
+                        network1_init_kwargs = values[3],
+                        problem_init_kwargs = values[5],
+                        optimization_init_kwargs = values[6],
+                        equation_init_kwargs = values[7],)
+        except:
+            c = Constants(run = values[0],
+                        domain_init_kwargs = values[1],
+                        data_init_kwargs = values[2],
+                        network_init_kwargs = values[3],
+                        problem_init_kwargs = values[5],
+                        optimization_init_kwargs = values[6],
+                        equation_init_kwargs = values[7],)
+    if values[4]:
+        run = PINN2(c)
+    else:
+        run = PINN(c)
 
     # Get model parameters
     checkpoint_list = sorted(glob(run.c.model_out_dir+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
-
+    if values[4]:
+        checkpoint_list2 = sorted(glob(run.c.model_out_dir2+'/*.pkl'), key=lambda x: int(x.split('_')[-1].split('.')[0]))
     with open(checkpoint_list[-1],"rb") as f:
         model_params = pickle.load(f)
-    all_params, model_fn, train_data = run.test()
+    if values[4]:
+        with open(checkpoint_list2[-1],"rb") as f:
+            model_params2 = pickle.load(f)
+    if values[4]:
+        all_params, model_fn, model_fn2, train_data = run.test()
+    else:
+        all_params, model_fn, train_data = run.test()
     try:
         model = Model(all_params["network1"]["layers"], model_fn)
-        all_params["network1"]["layers"] = from_state_dict(model, model_params).params
     except:
         model = Model(all_params["network"]["layers"], model_fn)
+    if values[4]:
+        model2 = Model(all_params["network2"]["layers"], model_fn2)
+    try:
+        all_params["network1"]["layers"] = from_state_dict(model, model_params).params
+    except:
         all_params["network"]["layers"] = from_state_dict(model, model_params).params
+    if values[4]:
+        all_params["network2"]["layers"] = from_state_dict(model2, model_params2).params
     domain_range = data['tecplot_init_kwargs']['domain_range']
     output_shape = data['tecplot_init_kwargs']['out_shape']
     order = data['tecplot_init_kwargs']['order']
@@ -252,5 +297,10 @@ if __name__ == "__main__":
     is_mean = data['tecplot_init_kwargs']['is_mean']
     path = os.path.dirname(cur_dir) + '/' + path
     pos_ref = all_params["domain"]["in_max"].flatten()
-    for timestep in timesteps:
-        Tecplotfile_gen(path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)
+    if "network2" in all_params.keys():
+        for timestep in timesteps:
+            Tecplotfile_gen(c, path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn, model_fn2)
+
+    else:
+        for timestep in timesteps:
+            Tecplotfile_gen(c, path, args.foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn)
