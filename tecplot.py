@@ -110,7 +110,7 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
                   for i in range(3) for j in range(3))
     return uvwp, vor_mag, Q, deriv_mat
 
-def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
+def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
