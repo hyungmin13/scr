@@ -108,11 +108,14 @@ class Constants(ConstantsBase):
         except:
             print("there is no second neural network")
         self.problem = problem.Problem
-        self.equation1 = eval('equation.'+ self.equation_init_kwargs['equation1'])
         try:
-            self.equation2 = eval('equation.'+ self.equation_init_kwargs['equation2'])
+            self.equation1 = eval('equation.'+ self.equation_init_kwargs['equation1'])
+            try:
+                self.equation2 = eval('equation.'+ self.equation_init_kwargs['equation2'])
+            except:
+                print("there is no 2nd equation")
         except:
-            print("there is no 2nd equation")
+            self.equation = eval('equation.'+ self.equation_init_kwargs['equation'])
         if self.optimization_init_kwargs['optimiser'] == 'soap':
             self.optimization_init_kwargs['optimiser'] = soap
         else:
