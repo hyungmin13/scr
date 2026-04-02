@@ -35,18 +35,24 @@ class PINNbase:
 
 class PINN(PINNbase):
     def test(self):
-        all_params = {"domain":{}, "data":{}, "network":{}, "problem":{}}
+        all_params = {"domain":{}, "data":{}, "problem":{}}
         all_params["domain"] = self.c.domain.init_params(**self.c.domain_init_kwargs)
         all_params["data"] = self.c.data.init_params(**self.c.data_init_kwargs)
         global_key = random.PRNGKey(42)
-        all_params["network"] = self.c.network.init_params(**self.c.network_init_kwargs)
+        try:
+            all_params["network1"] = self.c.network1.init_params(**self.c.network1_init_kwargs)
+        except:
+            all_params["network"] = self.c.network.init_params(**self.c.network_init_kwargs)
         all_params["problem"] = self.c.problem.init_params(**self.c.problem_init_kwargs)
         optimiser = self.c.optimization_init_kwargs["optimiser"](self.c.optimization_init_kwargs["learning_rate"])
         grids, all_params = self.c.domain.sampler(all_params)
         train_data, all_params = self.c.data.train_data(all_params)
         #all_params = self.c.problem.constraints(all_params)
         #valid_data = self.c.problem.exact_solution(all_params)
-        model_fn = c.network.network_fn
+        try:
+            model_fn = c.network1.network_fn
+        except:
+            model_fn = c.network.network_fn
         return all_params, model_fn, train_data
     
 def equ_func(all_params, g_batch, cotangent, model_fns):
@@ -65,8 +71,10 @@ def equ_func2(all_params, g_batch, cotangent, model_fns):
 
 def Derivatives(dynamic_params, all_params, g_batch, model_fns):
     keys = ['u_ref', 'v_ref', 'w_ref', 'u_ref']
-
-    all_params["network"]["layers"] = dynamic_params
+    try:
+        all_params["network1"]["layers"] = dynamic_params
+    except:
+        all_params["network"]["layers"] = dynamic_params
     out, out_x = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_y = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_z = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)    
@@ -88,7 +96,10 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
     
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
-    dynamic_params = all_params["network"].pop("layers")
+    try:
+        dynamic_params = all_params["network1"].pop("layers")
+    except:
+        dynamic_params = all_params["network"].pop("layers")
 
     # Create the evaluation grid
     gridbase = [np.linspace(domain_range[key][0], domain_range[key][1], output_shape[i]) for i, key in enumerate(['t', 'x', 'y', 'z'])]
@@ -202,14 +213,22 @@ if __name__ == "__main__":
     with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/summary/constants.pickle','rb') as f:
         constants = pickle.load(f)
     values = list(constants.values())
-
-    c = Constants(run = values[0],
-                domain_init_kwargs = values[1],
-                data_init_kwargs = values[2],
-                network_init_kwargs = values[3],
-                problem_init_kwargs = values[4],
-                optimization_init_kwargs = values[5],
-                equation_init_kwargs = values[6],)
+    try:
+        c = Constants(run = values[0],
+                    domain_init_kwargs = values[1],
+                    data_init_kwargs = values[2],
+                    network1_init_kwargs = values[3],
+                    problem_init_kwargs = values[4],
+                    optimization_init_kwargs = values[5],
+                    equation_init_kwargs = values[6],)
+    except:
+        c = Constants(run = values[0],
+                    domain_init_kwargs = values[1],
+                    data_init_kwargs = values[2],
+                    network_init_kwargs = values[3],
+                    problem_init_kwargs = values[4],
+                    optimization_init_kwargs = values[5],
+                    equation_init_kwargs = values[6],)
     run = PINN(c)
 
     # Get model parameters
@@ -218,8 +237,12 @@ if __name__ == "__main__":
     with open(checkpoint_list[-1],"rb") as f:
         model_params = pickle.load(f)
     all_params, model_fn, train_data = run.test()
-    model = Model(all_params["network"]["layers"], model_fn)
-    all_params["network"]["layers"] = from_state_dict(model, model_params).params
+    try:
+        model = Model(all_params["network1"]["layers"], model_fn)
+        all_params["network1"]["layers"] = from_state_dict(model, model_params).params
+    except:
+        model = Model(all_params["network"]["layers"], model_fn)
+        all_params["network"]["layers"] = from_state_dict(model, model_params).params
     domain_range = data['tecplot_init_kwargs']['domain_range']
     output_shape = data['tecplot_init_kwargs']['out_shape']
     order = data['tecplot_init_kwargs']['order']
