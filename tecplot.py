@@ -93,22 +93,30 @@ def Derivatives(dynamic_params, all_params, g_batch, model_fns):
         all_params["network1"]["layers"] = dynamic_params
     except:
         all_params["network"]["layers"] = dynamic_params
+    _, out_t = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[1.0, 0.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_x = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_y = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_z = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)    
+    _, out_xx = equ_func(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+    _, out_yy = equ_func(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
+    _, out_zz = equ_func(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 0.0, 1.0]]),(g_batch.shape[0],1)),model_fns)
     uvwp = np.concatenate([out[:,k:(k+1)]*all_params["data"][keys[k]] for k in range(len(keys))],1)
     uvwp[:,-1] = 1.185*uvwp[:,-1]
+    uts = np.concatenate([out_t[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,0] for k in range(len(keys))],1)
     uxs = np.concatenate([out_x[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1] for k in range(len(keys))],1)
     uys = np.concatenate([out_y[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2] for k in range(len(keys))],1)
     uzs = np.concatenate([out_z[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3] for k in range(len(keys))],1)
     deriv_mat = np.concatenate([np.expand_dims(uxs,2),np.expand_dims(uys,2),np.expand_dims(uzs,2)],2)
+    uxxs = np.concatenate([out_xx[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,1]**2 for k in range(len(keys))],1)
+    uyys = np.concatenate([out_yy[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,2]**2 for k in range(len(keys))],1)
+    uzzs = np.concatenate([out_zz[:,k:(k+1)]*all_params["data"][keys[k]]/all_params["domain"]["in_max"][0,3]**2 for k in range(len(keys))],1)
     vor_mag = np.sqrt((deriv_mat[:,1,2]-deriv_mat[:,2,1])**2+
                       (deriv_mat[:,2,0]-deriv_mat[:,0,2])**2+
                       (deriv_mat[:,0,1]-deriv_mat[:,1,0])**2)
     Q = 0.5 * sum(-np.abs(0.5 * (deriv_mat[:, i, j] + deriv_mat[:, j, i]))**2 +
                   np.abs(0.5 * (deriv_mat[:, i, j] - deriv_mat[:, j, i]))**2 
                   for i in range(3) for j in range(3))
-    return uvwp, vor_mag, Q, deriv_mat
+    return uvwp, vor_mag, Q, deriv_mat, uts, uxxs, uyys, uzzs
 
 def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
     
@@ -154,7 +162,7 @@ def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order
         mean_data = np.load(path + 'mean')
 
     # Evaluate the derivatives
-    uvwp, vor_mag, Q, deriv_mat = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
+    uvwp, vor_mag, Q, deriv_mat, ut, uxx, uyy, uzz = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
                                         for i in range(0, eval_grid.shape[0], 10000)])
     
     # Concatenate the results
@@ -163,7 +171,10 @@ def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order
     Q = np.concatenate(Q, axis=0)
     deriv_mat = np.concatenate(deriv_mat, axis=0)
     uvwp[:,3] = uvwp[:,3] - np.mean(uvwp[:,3])
-
+    ut = np.concatenate(ut,axis=0)
+    uxx = np.concatenate(uxx,axis=0)
+    uyy = np.concatenate(uyy,axis=0)
+    uzz = np.concatenate(uzz,axis=0)
     if is_ground:
         grounds = [ground_data[:,i+4].reshape(output_shape[1:]) for i in range(3)]
         errors = [np.sqrt(np.square(uvwp[:,i].reshape(output_shape[1:]) - grounds[i])) for i in range(3)]
@@ -186,7 +197,7 @@ def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order
     X, Y, Z = output_shape[1:]
     vars = [('u_pred[m/s]',np.float32(uvwp[:,0].reshape(-1))), ('v_pred[m/s]',np.float32(uvwp[:,1].reshape(-1))), 
             ('w_pred[m/s]',np.float32(uvwp[:,2].reshape(-1))), ('p_pred[Pa]',np.float32(uvwp[:,3].reshape(-1))),
-            ('Q[1/s^2]', np.float32(Q.reshape(-1)))]
+            ('Q[1/s^2]', np.float32(Q.reshape(-1))), ('ux', np.float32(deriv_mat[:,0,0].reshape(-1))), ('vx', np.float32(deriv_mat[:,0,1].reshape(-1))), ('wx', np.float32(deriv_mat[:,0,2].reshape(-1))), ('uy', np.float32(deriv_mat[:,1,0].reshape(-1))), ('vy', np.float32(deriv_mat[:,1,1].reshape(-1))), ('wy', np.float32(deriv_mat[:,1,2].reshape(-1))), ('uz', np.float32(deriv_mat[:,2,0].reshape(-1))), ('vz', np.float32(deriv_mat[:,2,1].reshape(-1))), ('wz', np.float32(deriv_mat[:,2,2].reshape(-1)))]
     if is_ground:
         vars += [('u_error[m/s]', np.float32(errors[0].reshape(-1))),
                  ('v_error[m/s]', np.float32(errors[1].reshape(-1))),
@@ -207,7 +218,7 @@ def Tecplotfile_gen(c_,path, name, all_params, domain_range, output_shape, order
     else:
         print('check')
         os.mkdir(path + 'npyresult/' + name)
-    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([eval_grid_e, uvwp, deriv_mat[:,:,0], deriv_mat[:,:,1], deriv_mat[:,:,2]], axis=1))
+    np.save(path + 'npyresult/' + name + f'/ts_{timestep:02d}' + '.npy', np.concatenate([eval_grid_e, uvwp, deriv_mat[:,:,0], deriv_mat[:,:,1], deriv_mat[:,:,2], ut, uxx, uyy, uzz], axis=1))
 #%%
 if __name__ == "__main__":
     from domain import *
@@ -231,18 +242,21 @@ if __name__ == "__main__":
     with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/summary/constants.pickle','rb') as f:
         constants = pickle.load(f)
     values = list(constants.values())
-    print(values)
+    print(values[3])
+    print(values[4])
     if values[4]:
         c = Constants(run = values[0],
                     domain_init_kwargs = values[1],
                     data_init_kwargs = values[2],
-                    network1_init_kwargs = values[3],
-                    network2_init_kwargs = values[4],
-                    problem_init_kwargs = values[5],
-                    optimization_init_kwargs = values[6],
-                    equation_init_kwargs = values[7],)
+                    network1_init_kwargs = values[4],
+                    network2_init_kwargs = values[5],
+                    problem_init_kwargs = values[6],
+                    optimization_init_kwargs = values[7],
+                    equation_init_kwargs = values[8],)
     else:
         try:
+            print('case1')
+            print(values[3])
             c = Constants(run = values[0],
                         domain_init_kwargs = values[1],
                         data_init_kwargs = values[2],
@@ -251,6 +265,7 @@ if __name__ == "__main__":
                         optimization_init_kwargs = values[6],
                         equation_init_kwargs = values[7],)
         except:
+            print('case2')
             c = Constants(run = values[0],
                         domain_init_kwargs = values[1],
                         data_init_kwargs = values[2],

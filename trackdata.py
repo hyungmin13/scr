@@ -78,7 +78,10 @@ class Data(Database):
         vel_ref['v_ref'] = all_params['data']['v_ref']
         vel_ref['w_ref'] = all_params['data']['w_ref']
         vel_ref['p_ref'] = all_params['data']['p_ref']
-        vel_ref['T_ref'] = all_params['data']['T_ref']
+        try:
+            vel_ref['T_ref'] = all_params['data']['T_ref']
+        except:
+            vel_ref['T_ref'] = 0.0
         all_params["data"].update(vel_ref)
         return all_params
 
@@ -104,6 +107,9 @@ class Data(Database):
         datas = Data.domain_filter(datas, data_keys, domain_range)
         train_data = Data.input_normalize(all_params, datas)
         all_params = Data.output_normalize(all_params, train_data)
+        all_params["data"]["in_mean"] = np.array([[np.mean(train_data['pos'][:,0]), np.mean(train_data['pos'][:,1]), np.mean(train_data['pos'][:,2]), np.mean(train_data['pos'][:,3])]])
+        all_params["data"]["in_std"] = np.array([[np.std(train_data['pos'][:,0]), np.std(train_data['pos'][:,1]), np.std(train_data['pos'][:,2]), np.std(train_data['pos'][:,3])]])
+        print(train_data['pos'].shape)
         return train_data, all_params
     
     @staticmethod

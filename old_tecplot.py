@@ -65,7 +65,9 @@ def equ_func2(all_params, g_batch, cotangent, model_fns):
 
 def Derivatives(dynamic_params, all_params, g_batch, model_fns):
     keys = ['u_ref', 'v_ref', 'w_ref', 'u_ref']
-
+    #all_params["data"][keys[0]] = 1.250502586364746
+    #all_params["data"][keys[1]] = 1.4215729236602783
+    #all_params["data"][keys[2]] = 0.8132602572441101
     all_params["network"]["layers"] = dynamic_params
     out, out_x = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 1.0, 0.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
     out, out_y = equ_func2(all_params, g_batch, jnp.tile(jnp.array([[0.0, 0.0, 1.0, 0.0]]),(g_batch.shape[0],1)),model_fns)
@@ -122,7 +124,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
     if is_ground:
         ground_data = np.load(path + 'ground/ts_' + str(timestep).zfill(2) + '.npy')
     if is_mean:
-        mean_data = np.load(path + 'mean')
+        mean_data = np.load(path + 'mean/mean.npy')
 
     # Evaluate the derivatives
     uvwp, vor_mag, Q, deriv_mat = zip(*[Derivatives(dynamic_params, all_params, eval_grid[i:i+10000], model_fn)
@@ -145,7 +147,7 @@ def Tecplotfile_gen(path, name, all_params, domain_range, output_shape, order, t
             temp_ground = ground_data[:,8].reshape(output_shape[1:])
             temp_error = np.sqrt(np.square(uvwp[:,4].reshape(output_shape[1:]) - temp_ground))
     if is_mean:
-        means = [mean_data['vel'][:,i].reshape(output_shape[1:]) for i in range(3)]
+        means = [mean_data[:,i].reshape(output_shape[1:]) for i in range(3)]
         flucs = [uvwp[:,i].reshape(output_shape[1:]) - means[i] for i in range(3)]
 
     # Tecplot file generation

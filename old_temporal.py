@@ -39,18 +39,18 @@ class PINN(PINNbase):
         all_params["domain"] = self.c.domain.init_params(**self.c.domain_init_kwargs)
         all_params["data"] = self.c.data.init_params(**self.c.data_init_kwargs)
         global_key = random.PRNGKey(42)
-        all_params["network1"] = self.c.network1.init_params(**self.c.network1_init_kwargs)
+        all_params["network"] = self.c.network.init_params(**self.c.network_init_kwargs)
         all_params["problem"] = self.c.problem.init_params(**self.c.problem_init_kwargs)
         optimiser = self.c.optimization_init_kwargs["optimiser"](self.c.optimization_init_kwargs["learning_rate"])
         grids, all_params = self.c.domain.sampler(all_params)
         train_data, all_params = self.c.data.train_data(all_params)
         #all_params = self.c.problem.constraints(all_params)
         #valid_data = self.c.problem.exact_solution(all_params)
-        model_fn = c.network1.network_fn
+        model_fn = c.network.network_fn
         return all_params, model_fn, train_data
 
 def temporal_error(path, foldername, all_params, domain_range, output_shape, order, timestep, is_ground, is_mean, model_fn):
-    
+
     # Load the parameters
     pos_ref = all_params["domain"]["in_max"].flatten()
 
@@ -62,12 +62,12 @@ def temporal_error(path, foldername, all_params, domain_range, output_shape, ord
             z_e, y_e, x_e = np.meshgrid(gridbase[-1], gridbase[-2], gridbase[-3], indexing='ij')
             z_n, y_n, x_n = np.meshgrid(gridbase_n[-1], gridbase_n[-2], gridbase_n[-3], indexing='ij')
         else:
-            y_e, z_e, x_e = np.meshgrid(gridbase[-2], gridbase[-1], gridbase[-3], indexing='ij')
-            y_n, z_n, x_n = np.meshgrid(gridbase_n[-2], gridbase_n[-1], gridbase_n[-3], indexing='ij')
-    elif order[0] == 1:
-        if order[1] == 0:
             z_e, x_e, y_e = np.meshgrid(gridbase[-1], gridbase[-3], gridbase[-2], indexing='ij')
             z_n, x_n, y_n = np.meshgrid(gridbase_n[-1], gridbase_n[-3], gridbase_n[-2], indexing='ij')
+    elif order[0] == 1:
+        if order[1] == 0:
+            y_e, z_e, x_e = np.meshgrid(gridbase[-2], gridbase[-1], gridbase[-3], indexing='ij')
+            y_n, z_n, x_n = np.meshgrid(gridbase_n[-2], gridbase_n[-1], gridbase_n[-3], indexing='ij')
         else:
             y_e, x_e, z_e = np.meshgrid(gridbase[-2], gridbase[-3], gridbase[-1], indexing='ij')
             y_n, x_n, z_n = np.meshgrid(gridbase_n[-2], gridbase_n[-3], gridbase_n[-1], indexing='ij')
@@ -107,8 +107,12 @@ def temporal_error(path, foldername, all_params, domain_range, output_shape, ord
         uvwp[:,1] = uvwp[:,1]*all_params["data"]['v_ref']
         uvwp[:,2] = uvwp[:,2]*all_params["data"]['w_ref']
         uvwp[:,3] = uvwp[:,3]*all_params["data"]['u_ref']
+        #uvwp[:,0] = uvwp[:,0]*1.3732656240463257
+        #uvwp[:,1] = uvwp[:,1]*1.471027135848999
+        #uvwp[:,2] = uvwp[:,2]*0.8579160571098328
+        #uvwp[:,3] = uvwp[:,3]*1.3732656240463257
         uvwp[:,3] = 1.185*(uvwp[:,3] - np.mean(uvwp[:,3]))
-
+        
         if is_ground:
             grounds = [ground_data[:,i+4].reshape(-1,1) for i in range(3)]
             V_mag = np.sqrt(grounds[0]**2 + grounds[1]**2 + grounds[2]**2)
@@ -143,7 +147,7 @@ def temporal_error(path, foldername, all_params, domain_range, output_shape, ord
             if len(locals()[name]) != 0:
                 matching_values.append(locals()[name])
                 matching_names.append(name)
-
+    print(matching_values) 
     if not os.path.exists(path + 'Errors/' + foldername):
         os.makedirs(path + 'Errors/' + foldername)
     with open(path + 'Errors/' + foldername + '/error_list.txt', 'w') as f:
@@ -164,6 +168,7 @@ if __name__ == "__main__":
     from problem import *
     from txt_reader import *
     import os
+
     parser = argparse.ArgumentParser(description='PINN')
     parser.add_argument('-f', '--foldername', type=str, help='foldername', default='HIT')
     parser.add_argument('-c', '--config', type=str, help='configuration', default='eval_config')
@@ -178,32 +183,14 @@ if __name__ == "__main__":
     with open(os.path.dirname(cur_dir)+ '/' + data['path'] + args.foldername +'/summary/constants.pickle','rb') as f:
         constants = pickle.load(f)
     values = list(constants.values())
-    if values[5]:
-        c = Constants(run = values[0],
-                    domain_init_kwargs = values[1],
-                    data_init_kwargs = values[2],
-                    network1_init_kwargs = values[4],
-                    network2_init_kwargs = values[5],
-                    problem_init_kwargs = values[6],
-                    optimization_init_kwargs = values[7],
-                    equation_init_kwargs = values[8],)
-    else:
-        try:
-            c = Constants(run = values[0],
-                        domain_init_kwargs = values[1],
-                        data_init_kwargs = values[2],
-                        network1_init_kwargs = values[4],
-                        problem_init_kwargs = values[6],
-                        optimization_init_kwargs = values[7],
-                        equation_init_kwargs = values[8],)
-        except:
-            c = Constants(run = values[0],
-                        domain_init_kwargs = values[1],
-                        data_init_kwargs = values[2],
-                        network_init_kwargs = values[3],
-                        problem_init_kwargs = values[5],
-                        optimization_init_kwargs = values[6],
-                        equation_init_kwargs = values[7],)
+
+    c = Constants(run = values[0],
+                domain_init_kwargs = values[1],
+                data_init_kwargs = values[2],
+                network_init_kwargs = values[3],
+                problem_init_kwargs = values[4],
+                optimization_init_kwargs = values[5],
+                equation_init_kwargs = values[6],)
     run = PINN(c)
 
     # Get model parameters
@@ -212,8 +199,8 @@ if __name__ == "__main__":
     with open(checkpoint_list[-1],"rb") as f:
         model_params = pickle.load(f)
     all_params, model_fn, train_data = run.test()
-    model = Model(all_params["network1"]["layers"], model_fn)
-    all_params["network1"]["layers"] = from_state_dict(model, model_params).params
+    model = Model(all_params["network"]["layers"], model_fn)
+    all_params["network"]["layers"] = from_state_dict(model, model_params).params
     domain_range = data['tecplot_init_kwargs']['domain_range']
     output_shape = data['tecplot_init_kwargs']['out_shape']
     order = data['tecplot_init_kwargs']['order']

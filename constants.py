@@ -93,20 +93,29 @@ class Constants(ConstantsBase):
         
         self.domain_init_kwargs = dict()
         self.data_init_kwargs = dict()
-        self.network1_init_kwargs = dict()
-        self.network2_init_kwargs = dict()
+        self.network_init_kwargs = dict()
+        #self.network1_init_kwargs = dict()
+        #self.network2_init_kwargs = dict()
         self.problem_init_kwargs = dict()
         self.optimization_init_kwargs = dict()
         self.equation_init_kwargs = dict()
+        print(kwargs.keys())
         for key in kwargs.keys(): self[key] = kwargs[key]
 
         self.domain = domain.Domain
         self.data = trackdata.Data
-        self.network1 = eval('network.'+ self.network1_init_kwargs['network_name'])
+        
         try:
-            self.network2 = eval('network.'+ self.network2_init_kwargs['network_name'])
+            print('check1')
+            print(self.network1_init_kwargs)
+            self.network1 = eval('network.'+ self.network1_init_kwargs['network_name'])
+            print('check2')
+            try:
+                self.network2 = eval('network.'+ self.network2_init_kwargs['network_name'])
+            except:
+                print("there is no second neural network")
         except:
-            print("there is no second neural network")
+            self.network = eval('network.'+ self.network_init_kwargs['network_name'])
         self.problem = problem.Problem
         try:
             self.equation1 = eval('equation.'+ self.equation_init_kwargs['equation1'])

@@ -108,7 +108,7 @@ class PINN(PINNbase):
                                            grids['eqns'][arg], 
                                            shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                              for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
-
+        #print(g_batch)
         b_batches = []
         for b_key in all_params["domain"]["bound_keys"]:
             b_batch = jnp.stack([random.choice(keys_next[k+5], 
@@ -116,7 +116,7 @@ class PINN(PINNbase):
                                             shape=(self.c.optimization_init_kwargs["e_batch"],)) 
                                             for k, arg in enumerate(list(all_params["domain"]["domain_range"].keys()))],axis=1)
             b_batches.append(b_batch)
-
+        #print(b_batches)
 
         # Initializing the update function
         update = PINN_update.lower(model_states, optimiser_fn, equation1_fn, dynamic_params, static_params, static_keys, g_batch, p_batch, v_batch, b_batches, model_fn).compile()
